@@ -1,0 +1,11 @@
+[project]
+name = "fintual-software-engineer-apply"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mypy>=1.19.1",
+    "pydantic>=2.12.5",
+    "ruff>=0.14.11",
+]
