@@ -3,18 +3,12 @@ from typing import Protocol
 from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
-from src.errors import BuyStockError, SellStockError
+from src.errors import BuyStockError, SellStockError, StockNotFoundError
 import logging
 import asyncio
 import random
-
-FAKE_MARKET = {
-    "AAPL": 250,
-    "META": 600,
-    "MSFT": 200,
-    "TSLA": 100,
-    "AMZN": 150,
-}
+from src.fake_market import NASDAQ
+from decimal import Decimal
 
 class OperationType(Enum):
     BUY = "BUY"
@@ -24,52 +18,72 @@ class BrokerOperation(BaseModel):
     date: datetime = datetime.now()
     symbol: str = Field(..., min_length=4, max_length=4, description="Symbol of the stock")
     
-class BuyStockRequest(BrokerOperation):
+class BuyStockByAmountRequest(BrokerOperation):
     operation_type: OperationType = OperationType.BUY
-    amount: float = Field(..., gt=0, description="Amount of money to buy")
+    amount: Decimal = Field(..., gt=0, description="Amount of money to buy")
     
     def __repr__(self) -> str:
         return f"BuyStockRequest(symbol={self.symbol}, amount={self.amount})"
 
+class BuyStockByQuantityRequest(BrokerOperation):
+    operation_type: OperationType = OperationType.BUY
+    quantity: Decimal = Field(..., gt=0, description="Quantity of the stock to buy") 
+       
+    def __repr__(self) -> str:
+        return f"BuyStockRequest(symbol={self.symbol}, quantity={self.quantity})"
+
 class BuyStockResponse(BrokerOperation):
     operation_type: OperationType = OperationType.BUY
-    amount: float = Field(..., gt=0, description="Amount of money to buy")
-    price: float = Field(..., gt=0, description="Price of the stock")
-    quantity: float = Field(..., gt=0, description="Quantity of the stock")
+    amount: Decimal = Field(..., gt=0, description="Amount of money to buy")
+    price: Decimal = Field(..., gt=0, description="Price of the stock")
+    quantity: Decimal = Field(..., gt=0, description="Quantity of the stock")
     
     def __repr__(self) -> str:
         return f"BuyStockResponse(symbol={self.symbol}, amount={self.amount}, price={self.price}, quantity={self.quantity})"
     
-class SellStockRequest(BrokerOperation):
+class SellStockByAmountRequest(BrokerOperation):
     operation_type: OperationType = OperationType.SELL
-    amount: float = Field(..., gt=0, description="Amount of money to sell")
+    amount: Decimal = Field(..., gt=0, description="Amount of money to sell")
     
     def __repr__(self) -> str:
         return f"SellStockRequest(symbol={self.symbol}, amount={self.amount})"
 
+class SellStockByQuantityRequest(BrokerOperation):
+    operation_type: OperationType = OperationType.SELL
+    quantity: Decimal = Field(..., gt=0, description="Quantity of the stock to sell")
+    
+    def __repr__(self) -> str:
+        return f"SellStockRequest(symbol={self.symbol}, quantity={self.quantity})"
+
 class SellStockResponse(BrokerOperation):
     operation_type: OperationType = OperationType.SELL
-    amount: float = Field(..., gt=0, description="Amount of money to sell")
-    price: float = Field(..., gt=0, description="Price of the stock")
-    quantity: float = Field(..., gt=0, description="Quantity of the stock")    
+    amount: Decimal = Field(..., gt=0, description="Amount of money to sell")
+    price: Decimal = Field(..., gt=0, description="Price of the stock")
+    quantity: Decimal = Field(..., gt=0, description="Quantity of the stock")    
     
     def __repr__(self) -> str:
         return f"SellStockResponse(symbol={self.symbol}, amount={self.amount}, price={self.price}, quantity={self.quantity})"
 
 class Broker(Protocol):
-    async def buy_stock_by_amount(self, request_data: BuyStockRequest) -> BuyStockResponse:
+    async def buy_stock_by_amount(self, request_data: BuyStockByAmountRequest) -> BuyStockResponse:
         ...
-    async def sell_stock_by_amount(self, request_data: SellStockRequest) -> SellStockResponse:
+    async def buy_stock_by_quantity(self, request_data: BuyStockByQuantityRequest) -> BuyStockResponse:
+        ...
+    async def sell_stock_by_amount(self, request_data: SellStockByAmountRequest) -> SellStockResponse:
+        ...
+    async def sell_stock_by_quantity(self, request_data: SellStockByQuantityRequest) -> SellStockResponse:
         ...
 
 class BanChileBroker:
     def __init__(self):
         logging.info("BanChileBroker, the best broker in the world, with the lower fees - initialized")
     
-    async def buy_stock_by_amount(self, request_data: BuyStockRequest) -> BuyStockResponse:
+    async def buy_stock_by_amount(self, request_data: BuyStockByAmountRequest) -> BuyStockResponse:
         
         try:
-            price = FAKE_MARKET[request_data.symbol]
+            stock_current_info = NASDAQ.get(request_data.symbol)
+            if not stock_current_info:
+                raise StockNotFoundError(f"Stock {request_data.symbol} not found")
             
             logging.info(f"Buying {request_data.amount} of {request_data.symbol}")
             await asyncio.sleep(random.randint(1, 2))
@@ -77,16 +91,38 @@ class BanChileBroker:
             return BuyStockResponse(
                 symbol=request_data.symbol,
                 amount=request_data.amount,
-                price=price,
-                quantity=request_data.amount / price
+                price=stock_current_info.price,
+                quantity=request_data.amount / stock_current_info.price
             )
         except Exception as e:
             raise BuyStockError(str(e))
-    
-    async def sell_stock_by_amount(self, request_data: SellStockRequest) -> SellStockResponse:
+        
+    async def buy_stock_by_quantity(self, request_data: BuyStockByQuantityRequest) -> BuyStockResponse:
         
         try:
-            price = FAKE_MARKET[request_data.symbol]
+            stock_current_info = NASDAQ.get(request_data.symbol)
+            if not stock_current_info:
+                raise StockNotFoundError(f"Stock {request_data.symbol} not found")
+                
+            logging.info(f"Buying {request_data.quantity} of {request_data.symbol}")
+            await asyncio.sleep(random.randint(1, 2))
+            
+            return BuyStockResponse(
+                symbol=request_data.symbol,
+                amount=stock_current_info.price * request_data.quantity,
+                price=stock_current_info.price,
+                quantity=request_data.quantity
+            )
+        except Exception as e:
+            raise BuyStockError(str(e))
+
+    
+    async def sell_stock_by_amount(self, request_data: SellStockByAmountRequest) -> SellStockResponse:
+        
+        try:
+            stock_current_info = NASDAQ.get(request_data.symbol)
+            if not stock_current_info:
+                raise StockNotFoundError(f"Stock {request_data.symbol} not found")
             
             logging.info(f"Selling {request_data.amount} of {request_data.symbol}")
             await asyncio.sleep(random.randint(1, 2))
@@ -94,8 +130,27 @@ class BanChileBroker:
             return SellStockResponse(
                 symbol=request_data.symbol,
                 amount=request_data.amount,
-                price=price,
-                quantity=request_data.amount / price
+                price=stock_current_info.price,
+                quantity=request_data.amount / stock_current_info.price
+            )
+        except Exception as e:
+            raise SellStockError(str(e))
+
+    async def sell_stock_by_quantity(self, request_data: SellStockByQuantityRequest) -> SellStockResponse:
+        
+        try:
+            stock_current_info = NASDAQ.get(request_data.symbol)
+            if not stock_current_info:
+                raise StockNotFoundError(f"Stock {request_data.symbol} not found")
+            
+            logging.info(f"Selling {request_data.quantity} of {request_data.symbol}")
+            await asyncio.sleep(random.randint(1, 2))
+        
+            return SellStockResponse(
+                symbol=request_data.symbol,
+                amount=stock_current_info.price * request_data.quantity,
+                price=stock_current_info.price,
+                quantity=request_data.quantity
             )
         except Exception as e:
             raise SellStockError(str(e))
