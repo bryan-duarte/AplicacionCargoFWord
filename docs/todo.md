@@ -10,9 +10,9 @@ Important: If you use LLMs that’s ok, but you must share the conversations.
 
 ## Clase Stock
     - [X] Asignar un symbol (AAPL, META) y un precio default.
-    - [ ] Implementar método `current_price` para actualizar precio desde el último valor.
-    - [ ] Evaluar variación porcentual > 1% para emitir evento de revisión del portafolio.
-    - [ ] Emitir evento para side effects cuando la variación absoluta supere ±1%. (Dejar en Config)
+    - [X] Implementar método `current_price` para actualizar precio desde el último valor.
+    - [X] Evaluar variación porcentual > 1% para emitir evento de revisión del portafolio.
+    - [X] Emitir evento para side effects cuando la variación absoluta supere ±1%. (Dejar en Config)
 
 ## Clase Portfolio
     - [X] Validar que el valor total sea ≥ 1 USD.
@@ -24,14 +24,14 @@ Important: If you use LLMs that’s ok, but you must share the conversations.
       - [X] Simular precios de mercado con un diccionario de precios.
 
     - [X] Crear `allocated_stock` (symbols + porcentajes) y reflejar allí los stocks que tiene el portafolio.
-    - [ ] Implementar método `rebalance` para ajustar compras/ventas y recuperar distribución inicial.
-    - [ ] Calcular valor total y clasificar cliente (retail si < 25,000 USD).
+    - [X] Implementar método `rebalance` para ajustar compras/ventas y recuperar distribución inicial.
+    - [X] Calcular valor total y clasificar cliente (retail si < 25,000 USD).
     - [ ] Respetar restricción retail:
       - [ ] Limitar a máximo 3 day trades en 5 días hábiles.
       - [ ] Registrar compras/ventas para auditar day trades.
 - [ ] Elemento clave del rebalance
-  - [ ] Ejecutar rebalance solo si una acción varió > 1% y eso generó dispersión > 2% en la distribución.
-  - [ ] Manejar caso de portafolio 40/60 (AAPL, META) donde un activo crece y excedente debe venderse para volver a `allocated_stock`.
+  - [X] Ejecutar rebalance solo si una acción varió > 1% y eso generó dispersión > 2% en la distribución.
+  - [X] Manejar caso de portafolio 40/60 (AAPL, META) donde un activo crece y excedente debe venderse para volver a `allocated_stock`.
 
 - [X] Acción de comprar o vender acciones
   - [X] Definir DTO con:
@@ -42,7 +42,7 @@ Important: If you use LLMs that’s ok, but you must share the conversations.
 
 # Config
   - [X] Crear archivo de settings para constantes configurables.
-  - [ ] Definir umbral 1% para eventos de revisión.
+  - [X] Definir umbral 1% para eventos de revisión.
   - [ ] Definir umbral 2% para eventos de rebalanceo.
 
 # Errores de negocio

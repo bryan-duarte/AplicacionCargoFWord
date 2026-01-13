@@ -1,4 +1,4 @@
-from src.stock import Stock
+from src.stock.stock import Stock
 from decimal import Decimal
 
 NASDAQ = {
