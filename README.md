@@ -15,7 +15,6 @@ Portafolio inicial:
 
 Inversión inicial: 10000
 Distribución de cada una 
-Aquí tienes la información organizada y simplificada en una tabla:
 
 | Stock | Porcentaje | Precio |
 | :--- | :--- | :--- |
@@ -26,8 +25,6 @@ Aquí tienes la información organizada y simplificada en una tabla:
 <img width="485" height="437" alt="antes-de-alertas" src="https://github.com/user-attachments/assets/f88626db-97ad-41d9-9bf6-e65307963292" />
 
 Cambios en precios:
-
-Aquí tienes la tabla actualizada con los precios de alerta incluidos:
 
 | Stock | % Cartera | Precio Inicial | Cambio en Precio |
 | :--- | :--- | :--- | :--- |
