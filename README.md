@@ -1,8 +1,10 @@
+## 🎥 Demo en video
+
+[![Ver el video en YouTube](https://img.youtube.com/vi/bdwrvlV7wQ8/maxresdefault.jpg)](https://youtu.be/bdwrvlV7wQ8)
 
 
 
-
-# Challenge cargo de Dev
+## Challenge cargo de Dev
 
 ```bash
 uv run main.py
@@ -11,7 +13,12 @@ Al ejecutar cambio de precio en las acciones, se puede observar como el portfoli
 
 Portafolio inicial:
 
+<img width="485" height="437" alt="antes-de-alertas" src="https://github.com/user-attachments/assets/f88626db-97ad-41d9-9bf6-e65307963292" />
+
 Portfolio final:
+
+<img width="758" height="444" alt="despues-de-cambios" src="https://github.com/user-attachments/assets/49b5e247-2ec7-4d42-87f2-ee1745e1e7e4" />
+
 
 # Piezas clave
 
