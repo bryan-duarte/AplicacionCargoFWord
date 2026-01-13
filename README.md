@@ -15,28 +15,33 @@ Portafolio inicial:
 
 Inversión inicial: 10000
 Distribución de cada una 
-    StockToAllocate(stock=NASDAQ.get("META"), percentage=Decimal("0.2")),
-    StockToAllocate(stock=NASDAQ.get("AAPL"), percentage=Decimal("0.4")),
-    StockToAllocate(stock=NASDAQ.get("MSFT"), percentage=Decimal("0.4")),
+Aquí tienes la información organizada y simplificada en una tabla:
 
-Precios iniciales por Stock:
-    "AAPL": Stock(symbol="AAPL", price=Decimal("250")),
-    "META": Stock(symbol="META", price=Decimal("150")),
-    "MSFT": Stock(symbol="MSFT", price=Decimal("600")),
+| Stock | Porcentaje | Precio |
+| :--- | :--- | :--- |
+| **AAPL** | 40% | 250 |
+| **META** | 20% | 150 |
+| **MSFT** | 40% | 600 |
 
 <img width="485" height="437" alt="antes-de-alertas" src="https://github.com/user-attachments/assets/f88626db-97ad-41d9-9bf6-e65307963292" />
 
 Cambios en precios:
 
-    await NASDAQ.get("META").set_price_alert("META", Decimal("300"))
-    await NASDAQ.get("AAPL").set_price_alert("AAPL", Decimal("200"))
-    await NASDAQ.get("MSFT").set_price_alert("MSFT", Decimal("900"))
+Aquí tienes la tabla actualizada con los precios de alerta incluidos:
+
+| Stock | % Cartera | Precio Inicial | Cambio en Precio |
+| :--- | :--- | :--- | :--- |
+| **AAPL** | 40% | 250 | 200 |
+| **META** | 20% | 150 | 300 |
+| **MSFT** | 40% | 600 | 900 |
 
 Portfolio final:
 
-Ante cada cambio de precio el sistema reaccionó y actualizó el portafolio para mantener la distribución
+Ante cada cambio de precio el sistema reaccionó y ejecutó compras y ventas para mantener la distribución
 
 <img width="434" height="218" alt="image" src="https://github.com/user-attachments/assets/6b70efc4-8bf5-4e6b-8477-127a6cf4960f" />
+
+
 
 <img width="758" height="444" alt="despues-de-cambios" src="https://github.com/user-attachments/assets/49b5e247-2ec7-4d42-87f2-ee1745e1e7e4" />
 
