@@ -2,7 +2,7 @@
 
 [![Ver el video en YouTube](https://img.youtube.com/vi/bdwrvlV7wQ8/maxresdefault.jpg)](https://youtu.be/bdwrvlV7wQ8)
 
-
+https://youtu.be/bdwrvlV7wQ8
 
 ## Challenge cargo de Dev
 
