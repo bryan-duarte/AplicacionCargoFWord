@@ -41,7 +41,7 @@ Ante cada cambio de precio el sistema reaccionó y ejecutó compras y ventas par
 
 <img width="434" height="218" alt="image" src="https://github.com/user-attachments/assets/6b70efc4-8bf5-4e6b-8477-127a6cf4960f" />
 
-
+El portafolio tiene un valor superior (13248) , pero mantiene su distribución
 
 <img width="758" height="444" alt="despues-de-cambios" src="https://github.com/user-attachments/assets/49b5e247-2ec7-4d42-87f2-ee1745e1e7e4" />
 
