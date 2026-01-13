@@ -1,4 +1,4 @@
-## 🎥 Resolviendo desafio en vivo
+## 🎥 Resolviendo desafio en vivo (Dar click y manda al video)
 
 [![Ver el video en YouTube](https://img.youtube.com/vi/bdwrvlV7wQ8/maxresdefault.jpg)](https://youtu.be/bdwrvlV7wQ8)
 
