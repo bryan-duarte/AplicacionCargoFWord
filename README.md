@@ -1,4 +1,4 @@
-## 🎥 Demo en video
+## 🎥 Resolviendo desafio en vivo
 
 [![Ver el video en YouTube](https://img.youtube.com/vi/bdwrvlV7wQ8/maxresdefault.jpg)](https://youtu.be/bdwrvlV7wQ8)
 
