@@ -52,22 +52,6 @@ EDGE CASE: Si a la gente del reddit WallStreet Bets le da por hacer un pump and 
 	Opinión mía ante el equipo: Pos sí, sí debería afectar. claramente no es grato, pero es parte de investir y el módulo de trading.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 Requerimientos de la implementación:
 
 La arquitectura debe (IMO) de ser basada en eventos, cambios en el precio significativos que veamos en las acciones ejecutará evaluar rebalanceos.Debe de haber un webshocket que esté escuchando cada 1 segundo las variaciones en el precio de las acciones en el portafolio, debemos escuchar solo los symbols en cartera, no todas las acciones del brokers.

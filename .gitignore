@@ -11,4 +11,6 @@ wheels/
 docs/*
 !docs/human_reasoning.md
 !docs/prompt.md
+.mypy_cache
+.ruff_cache
 

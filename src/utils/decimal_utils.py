@@ -2,9 +2,9 @@
 from decimal import Decimal, ROUND_HALF_UP
 from src.config.config import settings
 
-_QUANTIZER_MONEY = Decimal(f"0.{'0' * settings.decimal_precision.money}")
-_QUANTIZER_QUANTITY = Decimal(f"0.{'0' * settings.decimal_precision.quantity}")
-_QUANTIZER_PERCENTAGE = Decimal(f"0.{'0' * settings.decimal_precision.percentage}")
+_QUANTIZER_MONEY = Decimal(f"0.{'0' * settings.shared.money_decimal_precision}")
+_QUANTIZER_QUANTITY = Decimal(f"0.{'0' * settings.shared.quantity_decimal_precision}")
+_QUANTIZER_PERCENTAGE = Decimal(f"0.{'0' * settings.shared.percentage_decimal_precision}")
 
 
 def quantize_money(value: Decimal) -> Decimal:

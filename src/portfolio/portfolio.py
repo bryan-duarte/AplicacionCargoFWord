@@ -14,8 +14,11 @@ from typing import Awaitable
 from src.config.config import settings
 from src.portfolio.portfolio_register import portfolio_registry
 from src.portfolio.errors import PortfolioInitializationError
+from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
 from src.utils.decimal_utils import quantize_money
 from decimal import Decimal
+
+__all__ = ['Portfolio', 'PortfolioValue', 'AllocatedStock', 'StockToAllocate']
 
 
 class PortfolioValue(BaseModel):
@@ -24,8 +27,8 @@ class PortfolioValue(BaseModel):
     total_value: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Total value of the portfolio USD"
     )
     is_retail: bool = Field(
@@ -34,26 +37,9 @@ class PortfolioValue(BaseModel):
     )
 
 
-class StockToAllocate(BaseModel):
-    stock: Stock
-    percentage: Decimal = Field(
-        ...,
-        gt=0,
-        le=1,
-        max_digits=settings.pydantic_constraints.percentage,
-        decimal_places=settings.decimal_precision.percentage,
-        description="Percentage of the stock to allocate (0.0001 to 1.0000)"
-    )
-
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        frozen=True,
-    )
-
-
 class AllocatedStock(BaseModel):
     stock: Stock
-    percentage: Decimal = Field(
+    allocation_percentage: Decimal = Field(
         ..., gt=0, le=1, description="Percentage of the stock to allocate"
     )
     quantity: Decimal = Field(..., gt=0, description="Quantity of the stock")
@@ -70,35 +56,27 @@ class AllocatedStock(BaseModel):
         return f"""
         AllocatedStock(
             Stock: {self.stock.symbol} : Price: {self.stock.price}
-            
-            Percentage: {self.percentage * 100}%
+
+            Percentage: {self.allocation_percentage * 100}%
             Quantity: {self.quantity}
             Total Total Value: {self.total_value}
-        )    
+        )
         """
 
 
 class Portfolio:
     def __init__(
         self,
-        initial_investment: int,
-        stocks_to_allocate: list[StockToAllocate],
+        config: PortfolioConfig,
         broker: Broker,
-        portfolio_name: str,
     ):
-        self._portfolio_name = portfolio_name
-        if initial_investment < settings.minimum_investment:
-            raise ValueError(
-                f"Initial investment must be greater than or equal to {settings.minimum_investment}"
-            )
-
-        self._initial_investment = Decimal(initial_investment)
+        self._portfolio_name = config.portfolio_name
+        self._initial_investment = config.initial_investment
         self._stock_to_allocate: dict[str, StockToAllocate] = {}
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
 
-        self._validate_allocation_distribution(stocks_to_allocate)
-        self._set_stock_to_allocate(stocks_to_allocate)
+        self._set_stock_to_allocate(config.stocks_to_allocate)
         portfolio_registry.add(self)
 
     @property
@@ -114,28 +92,9 @@ class Portfolio:
             (stock.total_value for stock in self._allocated_stocks.values()), Decimal(0)
         )
         total_value = quantize_money(total_value)
-        is_retail = total_value < settings.retail_threshold
+        is_retail = total_value < settings.portfolio.retail_threshold_usd
 
         return PortfolioValue(total_value=total_value, is_retail=is_retail)
-
-    def _validate_allocation_distribution(
-        self, stocks_to_allocate: list[StockToAllocate]
-    ) -> None:
-        if not stocks_to_allocate:
-            raise ValueError("At least one stock allocation is required.")
-
-        total_percentage = sum(
-            (stock.percentage for stock in stocks_to_allocate), Decimal("0")
-        )
-
-        if total_percentage == 0:
-            raise ValueError("The allocation distribution sum cannot be zero.")
-
-        if abs(total_percentage - settings.validation_thresholds.percentage_sum) >= settings.validation_thresholds.percentage_tolerance:
-            raise ValueError(
-                "Sum of stock allocation percentages must equal 1.0 (100%). "
-                f"Current sum: {total_percentage} ({total_percentage * 100}%)"
-            )
 
     def _set_stock_to_allocate(self, stocks_to_allocate: list[StockToAllocate]) -> None:
         for stock in stocks_to_allocate:
@@ -158,7 +117,7 @@ class Portfolio:
                 self._buy_stock_by_amount(
                     BuyStockByAmountRequest(
                         symbol=stock.stock.symbol,
-                        amount=self._initial_investment * stock.percentage,
+                        amount=self._initial_investment * stock.allocation_percentage,
                     )
                 )
             )
@@ -193,7 +152,7 @@ class Portfolio:
 
         for allocated_stock in self._allocated_stocks.values():
             new_objective_total_value = (
-                portfolio_total_value * allocated_stock.percentage
+                portfolio_total_value * allocated_stock.allocation_percentage
             )
             new_objective_quantity = (
                 new_objective_total_value / allocated_stock.stock.price
@@ -201,7 +160,7 @@ class Portfolio:
 
             quantity_difference = new_objective_quantity - allocated_stock.quantity
 
-            need_to_rebalance = abs(quantity_difference) > settings.balance_threshold
+            need_to_rebalance = abs(quantity_difference) > settings.portfolio.rebalance_threshold
             if not need_to_rebalance:
                 continue
 
@@ -270,11 +229,11 @@ class Portfolio:
     async def _buy_stock_by_amount(
         self, buy_stock_by_amount_request: BuyStockByAmountRequest
     ) -> None:
-        """Compra stock por monto y actualiza el estado del portfolio."""
+        """Buy stock by amount and update the portfolio state."""
         response = await self._broker.buy_stock_by_amount(buy_stock_by_amount_request)
         self._allocated_stocks[response.symbol] = AllocatedStock(
             stock=Stock(symbol=response.symbol, price=response.price),
-            percentage=self._stock_to_allocate[response.symbol].percentage,
+            allocation_percentage=self._stock_to_allocate[response.symbol].allocation_percentage,
             quantity=response.quantity,
         )
 
@@ -282,7 +241,7 @@ class Portfolio:
         return f"""
         Portfolio(
             portfolio_name={self._portfolio_name},
-            initial_investment={self._initial_investment}, 
+            initial_investment={self._initial_investment},
             allocated_stocks={self._allocated_stocks}
         )
         """

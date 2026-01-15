@@ -18,22 +18,22 @@ class StockPriceChangeEvent(BaseModel):
     event_date: datetime = Field(default_factory=datetime.now)
     symbol: str = Field(
         ...,
-        min_length=4,
-        max_length=4,
+        min_length=settings.stock.symbol_min_length,
+        max_length=settings.stock.symbol_max_length,
         description="Symbol of the stock (4 uppercase letters)"
     )
     current_price: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Current price of the stock (USD)"
     )
     new_price: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="New price of the stock (USD)"
     )
 
@@ -48,14 +48,14 @@ class PortfolioRebalanceEvent(BaseModel):
     event_date: datetime = Field(default_factory=datetime.now)
     symbol: str = Field(
         ...,
-        min_length=4,
-        max_length=4,
+        min_length=settings.stock.symbol_min_length,
+        max_length=settings.stock.symbol_max_length,
         description="Symbol of the stock 4 uppercase letters"
     )
     new_price: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="New price of the stock USD"
     )

@@ -18,7 +18,7 @@ async def stock_price_change_handler(event: StockPriceChangeEvent):
     logging.info(f"Stock price changed Alert")
     have_significant_change = (
         abs(event.new_price - event.current_price) / event.current_price
-        > settings.stock_price_change_threshold
+        > settings.portfolio.price_change_alert_threshold_percent
     )
     if have_significant_change:
         await bus.emit(

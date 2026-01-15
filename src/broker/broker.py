@@ -6,14 +6,15 @@ from src.broker.broker_dtos import (
     BuyStockResponse,
     SellStockResponse,
 )
-from src.errors.errors import (
+from src.broker.errors import (
     StockNotFoundError,
     BuyStockError,
     SellStockError,
     BrokerConnectionError,
 )
-from src.fake_market.fake_market import NASDAQ
+from src.utils.fake_market import NASDAQ
 from src.utils.decimal_utils import quantize_quantity, quantize_money
+from src.config.config import settings
 import logging
 import asyncio
 import random
@@ -37,7 +38,7 @@ class BanChileBroker:
                     operation_uuid=operation_uuid,
                 )
 
-            await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds))
 
             return BuyStockResponse(
                 uuid=operation_uuid,
@@ -65,7 +66,7 @@ class BanChileBroker:
                     operation_uuid=operation_uuid,
                 )
 
-            await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds))
 
             return BuyStockResponse(
                 uuid=operation_uuid,
@@ -93,7 +94,7 @@ class BanChileBroker:
                     operation_uuid=operation_uuid,
                 )
 
-            await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds))
 
             return SellStockResponse(
                 uuid=operation_uuid,
@@ -121,7 +122,7 @@ class BanChileBroker:
                     operation_uuid=operation_uuid,
                 )
 
-            await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds))
 
             return SellStockResponse(
                 uuid=operation_uuid,

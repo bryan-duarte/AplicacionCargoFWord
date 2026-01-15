@@ -1,5 +1,6 @@
 import asyncio
 from src.portfolio.portfolio import Portfolio, StockToAllocate
+from src.portfolio.portfolio_dtos import PortfolioConfig
 from src.broker.broker import BanChileBroker
 import logging
 from src.event_bus.event_bus import bus, EventType
@@ -7,7 +8,7 @@ from src.event_bus.event_handlers import (
     stock_price_change_handler,
     portfolio_rebalance_handler,
 )
-from src.fake_market.fake_market import NASDAQ
+from src.utils.fake_market import NASDAQ
 from decimal import Decimal
 
 logging.basicConfig(level=logging.INFO)
@@ -16,16 +17,17 @@ logging.basicConfig(level=logging.INFO)
 async def main():
     INITIAL_INVESTMENT = 10000
 
-    risky_pedro_portfolio = Portfolio(
+    config = PortfolioConfig(
         portfolio_name="Risky Pedro",
-        initial_investment=INITIAL_INVESTMENT,
+        initial_investment=Decimal(str(INITIAL_INVESTMENT)),
         stocks_to_allocate=[
-            StockToAllocate(stock=NASDAQ.get("META"), percentage=Decimal("0.2")),
-            StockToAllocate(stock=NASDAQ.get("AAPL"), percentage=Decimal("0.4")),
-            StockToAllocate(stock=NASDAQ.get("MSFT"), percentage=Decimal("0.4")),
+            StockToAllocate(stock=NASDAQ.get("META"), allocation_percentage=Decimal("0.2")),
+            StockToAllocate(stock=NASDAQ.get("AAPL"), allocation_percentage=Decimal("0.4")),
+            StockToAllocate(stock=NASDAQ.get("MSFT"), allocation_percentage=Decimal("0.4")),
         ],
-        broker=BanChileBroker(),
     )
+
+    risky_pedro_portfolio = Portfolio(config=config, broker=BanChileBroker())
 
     bus.subscribe(EventType.STOCK_PRICE_CHANGE, stock_price_change_handler)
     bus.subscribe(EventType.PORTFOLIO_REBALANCE, portfolio_rebalance_handler)

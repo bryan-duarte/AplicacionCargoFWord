@@ -20,7 +20,10 @@ class OperationStatus(Enum):
 class BrokerOperation(BaseModel):
     date: datetime = datetime.now()
     symbol: str = Field(
-        ..., min_length=4, max_length=4, description="Symbol of the stock"
+        ...,
+        min_length=settings.stock.symbol_min_length,
+        max_length=settings.stock.symbol_max_length,
+        description="Symbol of the stock"
     )
 
 
@@ -32,10 +35,10 @@ class BuyStockByAmountRequest(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker_limits.min_money,
-        le=settings.broker_limits.max_money,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        ge=settings.broker.min_money,
+        le=settings.broker.max_money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Amount of money to buy (USD, max $10M)"
     )
 
@@ -51,10 +54,10 @@ class BuyStockByQuantityRequest(BrokerOperation):
     quantity: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker_limits.min_quantity_buy,
-        le=settings.broker_limits.max_quantity,
-        max_digits=settings.pydantic_constraints.quantity,
-        decimal_places=settings.decimal_precision.quantity,
+        ge=settings.broker.min_quantity_buy,
+        le=settings.broker.max_quantity,
+        max_digits=settings.shared.quantity_max_digits,
+        decimal_places=settings.shared.quantity_decimal_precision,
         description="Quantity of the stock to buy (supports fractional shares)"
     )
 
@@ -73,22 +76,22 @@ class BuyStockResponse(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Amount of money spent USD"
     )
     price: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Price per share USD"
     )
     quantity: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.quantity,
-        decimal_places=settings.decimal_precision.quantity,
+        max_digits=settings.shared.quantity_max_digits,
+        decimal_places=settings.shared.quantity_decimal_precision,
         description="Quantity of shares purchased"
     )
 
@@ -104,10 +107,10 @@ class SellStockByAmountRequest(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker_limits.min_money,
-        le=settings.broker_limits.max_money,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        ge=settings.broker.min_money,
+        le=settings.broker.max_money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Amount of money to sell USD"
     )
 
@@ -123,10 +126,10 @@ class SellStockByQuantityRequest(BrokerOperation):
     quantity: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker_limits.min_quantity_sell,
-        le=settings.broker_limits.max_quantity,
-        max_digits=settings.pydantic_constraints.quantity,
-        decimal_places=settings.decimal_precision.quantity,
+        ge=settings.broker.min_quantity_sell,
+        le=settings.broker.max_quantity,
+        max_digits=settings.shared.quantity_max_digits,
+        decimal_places=settings.shared.quantity_decimal_precision,
         description="Quantity of the stock to sell (supports fractional shares)"
     )
 
@@ -145,22 +148,22 @@ class SellStockResponse(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Amount of money received (USD)"
     )
     price: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.money,
-        decimal_places=settings.decimal_precision.money,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
         description="Price per share (USD)"
     )
     quantity: Decimal = Field(
         ...,
         gt=0,
-        max_digits=settings.pydantic_constraints.quantity,
-        decimal_places=settings.decimal_precision.quantity,
+        max_digits=settings.shared.quantity_max_digits,
+        decimal_places=settings.shared.quantity_decimal_precision,
         description="Quantity of shares sold"
     )
 
