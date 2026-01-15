@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+docs/*
+!docs/human_reasoning.md
+!docs/prompt.md
+

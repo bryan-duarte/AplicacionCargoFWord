@@ -8,7 +8,6 @@ from src.broker.broker_dtos import (
     SellStockResponse,
 )
 
-
 class Broker(Protocol):
     async def buy_stock_by_amount(
         self, request_data: BuyStockByAmountRequest

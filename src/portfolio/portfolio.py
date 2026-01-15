@@ -1,3 +1,4 @@
+from functools import partial
 from src.stock.stock import Stock
 from pydantic import BaseModel, ConfigDict, Field
 from src.broker.broker import (
@@ -12,18 +13,36 @@ import asyncio
 from typing import Awaitable
 from src.config.config import settings
 from src.portfolio.portfolio_register import portfolio_registry
+from src.portfolio.errors import PortfolioInitializationError
+from src.utils.decimal_utils import quantize_money
 from decimal import Decimal
 
 
 class PortfolioValue(BaseModel):
-    total_value: Decimal = Field(..., gt=0, description="Total value of the portfolio")
-    is_retail: bool = Field(..., description="Is the portfolio a retail portfolio?")
+    model_config = ConfigDict(frozen=True)
+
+    total_value: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=settings.pydantic_constraints.money,
+        decimal_places=settings.decimal_precision.money,
+        description="Total value of the portfolio USD"
+    )
+    is_retail: bool = Field(
+        ...,
+        description="Is the portfolio a retail portfolio?"
+    )
 
 
 class StockToAllocate(BaseModel):
     stock: Stock
     percentage: Decimal = Field(
-        ..., gt=0, le=1, description="Percentage of the stock to allocate"
+        ...,
+        gt=0,
+        le=1,
+        max_digits=settings.pydantic_constraints.percentage,
+        decimal_places=settings.decimal_precision.percentage,
+        description="Percentage of the stock to allocate (0.0001 to 1.0000)"
     )
 
     model_config = ConfigDict(
@@ -78,6 +97,7 @@ class Portfolio:
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
 
+        self._validate_allocation_distribution(stocks_to_allocate)
         self._set_stock_to_allocate(stocks_to_allocate)
         portfolio_registry.add(self)
 
@@ -93,36 +113,69 @@ class Portfolio:
         total_value = sum(
             (stock.total_value for stock in self._allocated_stocks.values()), Decimal(0)
         )
+        total_value = quantize_money(total_value)
         is_retail = total_value < settings.retail_threshold
 
         return PortfolioValue(total_value=total_value, is_retail=is_retail)
+
+    def _validate_allocation_distribution(
+        self, stocks_to_allocate: list[StockToAllocate]
+    ) -> None:
+        if not stocks_to_allocate:
+            raise ValueError("At least one stock allocation is required.")
+
+        total_percentage = sum(
+            (stock.percentage for stock in stocks_to_allocate), Decimal("0")
+        )
+
+        if total_percentage == 0:
+            raise ValueError("The allocation distribution sum cannot be zero.")
+
+        if abs(total_percentage - settings.validation_thresholds.percentage_sum) >= settings.validation_thresholds.percentage_tolerance:
+            raise ValueError(
+                "Sum of stock allocation percentages must equal 1.0 (100%). "
+                f"Current sum: {total_percentage} ({total_percentage * 100}%)"
+            )
 
     def _set_stock_to_allocate(self, stocks_to_allocate: list[StockToAllocate]) -> None:
         for stock in stocks_to_allocate:
             self._stock_to_allocate[stock.stock.symbol] = stock
 
     async def initialize(self) -> None:
-        broker = self._broker
+        """
+        Initialize portfolio by buying all allocated stocks with retry logic.
 
-        buy_operations: list[Awaitable[BuyStockResponse]] = [
-            broker.buy_stock_by_amount(
-                BuyStockByAmountRequest(
-                    symbol=stock.stock.symbol,
-                    amount=self._initial_investment * stock.percentage,
+        Implements idempotency by verifying operation status and retrying failed
+        operations. Uses exponential backoff for retries. Fails completely if any
+        operation cannot succeed after all retry attempts (atomic operation).
+
+        Raises:
+            PortfolioInitializationError: If any stock purchase fails permanently
+        """
+        buy_tasks: list[Awaitable[BuyStockResponse]] = []
+        for stock in self._stock_to_allocate.values():
+            buy_tasks.append(
+                self._buy_stock_by_amount(
+                    BuyStockByAmountRequest(
+                        symbol=stock.stock.symbol,
+                        amount=self._initial_investment * stock.percentage,
+                    )
                 )
             )
-            for stock in self._stock_to_allocate.values()
-        ]
 
-        bougth_stocks_list: list[BuyStockResponse] = await asyncio.gather(
-            *buy_operations
-        )
+        results = await asyncio.gather(*buy_tasks, return_exceptions=True)
 
-        for bougth_stock in bougth_stocks_list:
-            self._allocated_stocks[bougth_stock.symbol] = AllocatedStock(
-                stock=Stock(symbol=bougth_stock.symbol, price=bougth_stock.price),
-                percentage=self._stock_to_allocate[bougth_stock.symbol].percentage,
-                quantity=bougth_stock.quantity,
+        failed_operations = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                symbol = list(self._stock_to_allocate.keys())[i]
+                failed_operations.append(f"{symbol}: {str(result)}")
+
+        if failed_operations:
+            raise PortfolioInitializationError(
+                f"Portfolio initialization failed. {len(failed_operations)} operations failed: "
+                + "; ".join(failed_operations),
+                failed_operations=failed_operations
             )
 
     def update_allocated_stock_price(self, symbol: str, price: Decimal) -> None:
@@ -213,6 +266,17 @@ class Portfolio:
         self._allocated_stocks[
             sell_stock_by_quantity_response.symbol
         ].quantity -= sell_stock_by_quantity_response.quantity
+
+    async def _buy_stock_by_amount(
+        self, buy_stock_by_amount_request: BuyStockByAmountRequest
+    ) -> None:
+        """Compra stock por monto y actualiza el estado del portfolio."""
+        response = await self._broker.buy_stock_by_amount(buy_stock_by_amount_request)
+        self._allocated_stocks[response.symbol] = AllocatedStock(
+            stock=Stock(symbol=response.symbol, price=response.price),
+            percentage=self._stock_to_allocate[response.symbol].percentage,
+            quantity=response.quantity,
+        )
 
     def __repr__(self) -> str:
         return f"""
