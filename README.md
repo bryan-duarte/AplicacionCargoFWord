@@ -13,9 +13,10 @@
 </div>
 
 ---
+
 Disclaimer:
 
-Resubmit request: Solicité si podrían reconsiderar mi postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación.
+Resubmit request: Solicité si podrían reconsiderar mi re-postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación.
 
 En el submit previo, mucho bla bla bla, que patrón de diseño 1,2,3 pero el core del negocio no era atendido. Era bueno para un tutorial, pero no era production grade propio de una postulación a un L2. (IMO)
 
@@ -26,6 +27,9 @@ Se eliminaron las bobadas y quedó lo clave, que la funcionalidad funcione BIEN,
 ## 📋 Descripción
 
 Sistema de gestión de portafolios de inversión en tiempo real con **rebalanceo automático** basado en cambios de precio de acciones.
+
+## Uso de LLM's
+Los usos principales de llm para el proyecto estan detallados en docs/ según los requerimietnos del proceso.
 
 ---
 
