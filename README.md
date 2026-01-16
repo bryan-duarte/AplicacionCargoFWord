@@ -1,12 +1,14 @@
+<img width="1584" height="672" alt="image" src="https://github.com/user-attachments/assets/3589e35c-c816-486c-bebf-834b521abbc7" />
+
+
 <div align="center">
 
 # 🏦 FWord Auto balancer
 
 **Sistema de gestión de portafolios con rebalanceo automático y operaciones atómicas**
 
-[Python 3.11+](https://www.python.org/)(https://opensource.org/licenses/MIT) [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[Python 3.11+] [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-[Features](#-features-destacadas) • [Arquitectura](#-arquitectura) • [Instalación](#-instalacin) • [Uso](#-uso) • [Testing](#-testing)
 
 </div>
 
@@ -319,16 +321,6 @@ uv run pytest tests/integration/test_portfolio_rebalancing.py --cov=src/portfoli
 uv run pytest tests/ -v
 ```
 
-### Opciones de Logging Disponibles
-
-| Opción | Descripción |
-|--------|-------------|
-| `--log-cli-level=INFO` | Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
-| `--log-cli-format` | Formato personalizado de los logs |
-| `--log-cli-date-format` | Formato de fecha/hora en los logs |
-| `-v` | Modo verbose de pytest |
-| `-s` | Mostrar output de print statements |
-
 ### Ejemplo de Salida con Logs
 
 ```
@@ -364,7 +356,7 @@ tests/integration/test_portfolio_rebalancing.py::TestBatchRollback::test_rollbac
 | **pytest** | >= 9.0.2 | Framework de testing |
 | **mypy** | >= 1.19.1 | Type checking estático |
 | **ruff** | >= 0.14.11 | Linter ultra-rápido (reemplaza flake8, pylint, isort) y formatter (reemplaza black) |
-| **asyncio** | (stdlib) | Programación asíncrona |
+| **asyncio** | (stdlib) | Programación asíncrona en Python |
 
 ---
 
