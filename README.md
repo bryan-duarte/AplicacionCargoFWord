@@ -51,8 +51,8 @@ El sistema implementa un **bloqueo distribuido a nivel de portafolio** que previ
 Todas las operaciones del broker se agrupan en **transacciones atómicas** con rollback automático:
 
 - **Operaciones atómicas**: Todas las compras/ventas en un rebalanceo se ejecutan como una unidad
-- **Seguimiento de estado**: Cada operación tiene estados (PENDING → SUCCESS → ERROR → ROLLED_BACK)
-- **Compensación automática**: Si alguna operacion falla, las exitosas se revierten automáticamente
+- **Seguimiento de estado**: Cada operación tiene estados 
+- **Compensación automática**: Si alguna operacion falla, las exitosas se revierten automáticamente ejecutando la acción contraria
 - **Reintentos configurables**: Hasta 3 reintentos con delay configurable para operaciones de rollback
 - **Logging completo**: Toda la traza de operaciones queda registrada para auditoría
 
