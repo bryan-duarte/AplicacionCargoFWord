@@ -1,5 +1,5 @@
 [project]
-name = "fintual-software-engineer-apply"
+name = "FWord-software-engineer-apply"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,4 +8,13 @@ dependencies = [
     "mypy>=1.19.1",
     "pydantic>=2.12.5",
     "ruff>=0.14.11",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "pytest-freezegun>=0.4.2",
+    "pytest-mock>=3.15.1",
 ]

@@ -1,4 +1,9 @@
-from src.stock.stock import Stock
+from decimal import Decimal
+from typing import Awaitable, Union, Optional
+from uuid import uuid4
+import logging
+import asyncio
+from datetime import datetime, timedelta
 from pydantic import BaseModel, ConfigDict, Field
 from src.broker.broker import (
     BuyStockByAmountRequest,
@@ -7,34 +12,36 @@ from src.broker.broker import (
     BuyStockResponse,
     SellStockResponse,
 )
+from src.broker.broker_dtos import BrokerOperation
 from src.broker.broker_interface import Broker
-import asyncio
-from typing import Awaitable
 from src.config.config import settings
+from src.portfolio.errors import PortfolioError, PortfolioInitializationError
+from typing import Optional
+from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
 from src.portfolio.portfolio_register import portfolio_registry
-from decimal import Decimal
+from src.stock.stock import Stock
+from src.utils.decimal_utils import quantize_money, quantize_quantity
 
 
 class PortfolioValue(BaseModel):
-    total_value: Decimal = Field(..., gt=0, description="Total value of the portfolio")
-    is_retail: bool = Field(..., description="Is the portfolio a retail portfolio?")
+    model_config = ConfigDict(frozen=True)
 
-
-class StockToAllocate(BaseModel):
-    stock: Stock
-    percentage: Decimal = Field(
-        ..., gt=0, le=1, description="Percentage of the stock to allocate"
+    total_value: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=settings.shared.money_max_digits,
+        decimal_places=settings.shared.money_decimal_precision,
+        description="Total value of the portfolio USD"
     )
-
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        frozen=True,
+    is_retail: bool = Field(
+        ...,
+        description="Is the portfolio a retail portfolio?"
     )
 
 
 class AllocatedStock(BaseModel):
     stock: Stock
-    percentage: Decimal = Field(
+    allocation_percentage: Decimal = Field(
         ..., gt=0, le=1, description="Percentage of the stock to allocate"
     )
     quantity: Decimal = Field(..., gt=0, description="Quantity of the stock")
@@ -51,34 +58,47 @@ class AllocatedStock(BaseModel):
         return f"""
         AllocatedStock(
             Stock: {self.stock.symbol} : Price: {self.stock.price}
-            
-            Percentage: {self.percentage * 100}%
+
+            Percentage: {self.allocation_percentage * 100}%
             Quantity: {self.quantity}
             Total Total Value: {self.total_value}
-        )    
+        )
         """
 
 
 class Portfolio:
     def __init__(
         self,
-        initial_investment: int,
-        stocks_to_allocate: list[StockToAllocate],
+        config: PortfolioConfig,
         broker: Broker,
-        portfolio_name: str,
+        *,
+        retail_threshold_usd: Optional[int] = None,
+        rebalance_threshold: Optional[Decimal] = None,
     ):
-        self._portfolio_name = portfolio_name
-        if initial_investment < settings.minimum_investment:
-            raise ValueError(
-                f"Initial investment must be greater than or equal to {settings.minimum_investment}"
-            )
+        """Initialize a Portfolio with configuration and broker.
 
-        self._initial_investment = Decimal(initial_investment)
+        Args:
+            config: Portfolio configuration with name, investment, and stocks
+            broker: Broker instance for executing trades
+            retail_threshold_usd: Threshold for retail classification (default: 25000)
+            rebalance_threshold: Minimum quantity difference to trigger rebalancing (default: 0.00)
+        """
+        self._portfolio_name = config.portfolio_name
+        self._initial_investment = config.initial_investment
         self._stock_to_allocate: dict[str, StockToAllocate] = {}
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
+        self._stale: bool = False
 
-        self._set_stock_to_allocate(stocks_to_allocate)
+        self._retail_threshold_usd = retail_threshold_usd if retail_threshold_usd is not None else 25000
+        self._rebalance_threshold = rebalance_threshold if rebalance_threshold is not None else Decimal("0.00")
+
+        # Rebalance lock attributes
+        self._is_rebalancing: bool = False
+        self._rebalance_start_time: Optional[datetime] = None
+        self._rebalance_lock_ttl_seconds: int = config.rebalance_lock_ttl_seconds
+
+        self._set_stock_to_allocate(config.stocks_to_allocate)
         portfolio_registry.add(self)
 
     @property
@@ -89,11 +109,29 @@ class Portfolio:
     def allocated_stocks(self) -> dict[str, AllocatedStock]:
         return self._allocated_stocks
 
+    @property
+    def is_locked(self) -> bool:
+        """Check if portfolio is currently locked (rebalancing in progress)."""
+        return self._is_rebalancing
+
+    @property
+    def is_stale(self) -> bool:
+        """Check if portfolio is in stale state."""
+        return self._stale
+
+    @property
+    def lock_age_seconds(self) -> Optional[float]:
+        """Get the age of the current lock in seconds, or None if not locked."""
+        if self._rebalance_start_time is None:
+            return None
+        return (datetime.now() - self._rebalance_start_time).total_seconds()
+
     def get_total_value(self) -> PortfolioValue:
         total_value = sum(
             (stock.total_value for stock in self._allocated_stocks.values()), Decimal(0)
         )
-        is_retail = total_value < settings.retail_threshold
+        total_value = quantize_money(total_value)
+        is_retail = total_value < self._retail_threshold_usd
 
         return PortfolioValue(total_value=total_value, is_retail=is_retail)
 
@@ -101,100 +139,219 @@ class Portfolio:
         for stock in stocks_to_allocate:
             self._stock_to_allocate[stock.stock.symbol] = stock
 
-    async def initialize(self) -> None:
-        broker = self._broker
-
-        buy_operations: list[Awaitable[BuyStockResponse]] = [
-            broker.buy_stock_by_amount(
-                BuyStockByAmountRequest(
-                    symbol=stock.stock.symbol,
-                    amount=self._initial_investment * stock.percentage,
-                )
+    def _check_stale_state(self) -> None:
+        """Raise error if portfolio is in stale state."""
+        if self._stale:
+            logging.warning(
+                f"Rebalance rejected for '{self._portfolio_name}': "
+                "portfolio is in stale state. Manual recovery required."
             )
-            for stock in self._stock_to_allocate.values()
-        ]
+            raise PortfolioError(
+                f"Portfolio '{self._portfolio_name}' is in stale state. "
+                "Manual recovery required. Call clear_stale_state() after verification."
+            )
+    
+    def set_stale_state(self) -> None:
+        """Manually set the stale state."""
+        self._stale = True
+        logging.info(f"Alert: Stale state set for '{self._portfolio_name}'")
 
-        bougth_stocks_list: list[BuyStockResponse] = await asyncio.gather(
-            *buy_operations
+    def clear_stale_state(self) -> None:
+        """Manually clear the stale state."""
+        self._stale = False
+        logging.info(f"Alert: Stale state cleared for '{self._portfolio_name}'")
+
+    def _can_acquire_rebalance_lock(self) -> bool:
+        """Check if the rebalance lock can be acquired.
+
+        Returns True if:
+        - No rebalance is currently in progress, OR
+        - The current lock has expired (TTL exceeded)
+
+        If the lock has expired, it will be cleaned up automatically.
+        """
+        if not self._is_rebalancing:
+            return True
+
+        # Check if lock has expired
+        if self._rebalance_start_time is not None:
+            lock_age = datetime.now() - self._rebalance_start_time
+            if lock_age.total_seconds() > self._rebalance_lock_ttl_seconds:
+                # Lock has expired, clean it up
+                logging.warning(
+                    f"Rebalance lock expired for '{self._portfolio_name}' "
+                    f"(age: {lock_age.total_seconds():.1f}s, TTL: {self._rebalance_lock_ttl_seconds}s). "
+                    "Cleaning up stale lock."
+                )
+                self._is_rebalancing = False
+                self._rebalance_start_time = None
+                return True
+
+        return False
+
+    async def initialize(self) -> None:
+        """
+        Initialize portfolio with batch support and automatic rollback.
+
+        Raises:
+            PortfolioInitializationError: If initialization fails
+            PortfolioError: If portfolio is in stale state
+        """
+        self._check_stale_state()
+        batch_uuid = uuid4()
+
+        tasks_by_symbol: dict[str, Awaitable[BuyStockResponse]] = {}
+        for stock in self._stock_to_allocate.values():
+            request = BuyStockByAmountRequest(
+                symbol=stock.stock.symbol,
+                amount=self._initial_investment * stock.allocation_percentage,
+                batch_uuid=batch_uuid,
+            )
+            tasks_by_symbol[request.symbol] = self._buy_stock_by_amount(request)
+
+        results_list: list[Union[BrokerOperation, Exception]] = await asyncio.gather(
+            *tasks_by_symbol.values(), return_exceptions=True
         )
 
-        for bougth_stock in bougth_stocks_list:
-            self._allocated_stocks[bougth_stock.symbol] = AllocatedStock(
-                stock=Stock(symbol=bougth_stock.symbol, price=bougth_stock.price),
-                percentage=self._stock_to_allocate[bougth_stock.symbol].percentage,
-                quantity=bougth_stock.quantity,
+        failed_operations = []
+        failed_operations.extend(
+            f"{symbol}: {result}"
+            for symbol, result in zip(tasks_by_symbol, results_list)
+            if isinstance(result, Exception)
+        )
+
+        if failed_operations:
+            rollback_success = await self._broker.batch_rollback(batch_uuid)
+
+            if not rollback_success:
+                self.set_stale_state()
+                raise PortfolioInitializationError(
+                        f"Initialization failed. Rollback also failed. Portfolio is in stale state.",
+                        failed_operations=failed_operations,
+                    )
+
+            raise PortfolioInitializationError(
+                f"All {len(failed_operations)} operations failed: " + "; ".join(failed_operations),
+                failed_operations=failed_operations,
             )
 
     def update_allocated_stock_price(self, symbol: str, price: Decimal) -> None:
         self._allocated_stocks[symbol].stock.current_price(price)
 
-    def _get_balance_operations(
+    def _get_balance_operations_batch(
         self,
+        batch_uuid,
     ) -> tuple[list[Awaitable[BuyStockResponse]], list[Awaitable[SellStockResponse]]]:
+        """Get balance operations with batch UUID included."""
+        
+        broker = self._broker
         portfolio_total_value = self.get_total_value().total_value
 
         buy_operations_list: list[Awaitable[BuyStockResponse]] = []
         sell_operations_list: list[Awaitable[SellStockResponse]] = []
 
-        broker = self._broker
-
         for allocated_stock in self._allocated_stocks.values():
             new_objective_total_value = (
-                portfolio_total_value * allocated_stock.percentage
+                portfolio_total_value * allocated_stock.allocation_percentage
             )
-            new_objective_quantity = (
+            new_objective_quantity = quantize_quantity(
                 new_objective_total_value / allocated_stock.stock.price
             )
 
             quantity_difference = new_objective_quantity - allocated_stock.quantity
 
-            need_to_rebalance = abs(quantity_difference) > settings.balance_threshold
+            need_to_rebalance = abs(quantity_difference) > self._rebalance_threshold
             if not need_to_rebalance:
                 continue
 
-            need_to_buy = quantity_difference > 0
-            if need_to_buy:
+            if quantity_difference > 0:  # Need to buy
                 buy_operations_list.append(
                     broker.buy_stock_by_quantity(
                         BuyStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
-                            quantity=abs(quantity_difference),
+                            quantity=quantize_quantity(abs(quantity_difference)),
+                            batch_uuid=batch_uuid,
                         )
                     )
                 )
-
-            need_to_sell = quantity_difference < 0
-            if need_to_sell:
+            elif quantity_difference < 0:  # Need to sell
                 sell_operations_list.append(
                     broker.sell_stock_by_quantity(
                         SellStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
-                            quantity=abs(quantity_difference),
+                            quantity=quantize_quantity(abs(quantity_difference)),
+                            batch_uuid=batch_uuid,
                         )
                     )
                 )
+
         return buy_operations_list, sell_operations_list
 
     async def rebalance(self) -> None:
-        buy_operations_list, sell_operations_list = self._get_balance_operations()
+        self._check_stale_state()
 
-        if buy_operations_list:
-            buy_executed_operations: list[BuyStockResponse] = await asyncio.gather(
-                *buy_operations_list
+        if not self._can_acquire_rebalance_lock():
+            logging.warning(
+                f"Rebalance rejected for '{self._portfolio_name}': "
+                "another rebalance is already in progress"
             )
-            for response in buy_executed_operations:
-                self._allocated_stocks[response.symbol].quantity += response.quantity
+            return
 
-        if sell_operations_list:
-            sell_executed_operations: list[SellStockResponse] = await asyncio.gather(
-                *sell_operations_list
-            )
-            for response in sell_executed_operations:
-                self._allocated_stocks[response.symbol].quantity -= response.quantity
+        self._is_rebalancing = True
+        self._rebalance_start_time = datetime.now()
+        logging.info(f"Rebalance lock acquired for '{self._portfolio_name}'")
+
+        try:
+            batch_uuid = uuid4()
+            buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
+
+            buy_results: list[Union[BuyStockResponse, Exception]] = []
+            sell_results: list[Union[SellStockResponse, Exception]] = []
+
+            if buy_operations_list:
+                buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
+
+            if sell_operations_list:
+                sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
+
+            buy_failures = [failure for failure in buy_results if isinstance(failure, Exception)]
+            sell_failures = [failure for failure in sell_results if isinstance(failure, Exception)]
+            failures = buy_failures + sell_failures
+
+            if failures:
+                has_successful_operations = any(
+                    isinstance(result, (BuyStockResponse, SellStockResponse))
+                    for result in (*buy_results, *sell_results)
+                )
+
+                if has_successful_operations:
+                    rollback_success = await self._broker.batch_rollback(batch_uuid)
+
+                    if not rollback_success:
+                        self.set_stale_state()
+                        raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
+
+                    raise PortfolioError("Rebalancing failed. Rolled back partial executions in broker.")
+
+                raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
+
+            for response in buy_results:
+                if isinstance(response, BuyStockResponse):
+                    self._allocated_stocks[response.symbol].quantity += response.quantity
+
+            for response in sell_results:
+                if isinstance(response, SellStockResponse):
+                    self._allocated_stocks[response.symbol].quantity -= response.quantity
+
+        finally:
+            self._is_rebalancing = False
+            self._rebalance_start_time = None
+            logging.info(f"Rebalance lock released for '{self._portfolio_name}'")
 
     async def _buy_stock(
         self, buy_stock_by_quantity_request: BuyStockByQuantityRequest
     ) -> None:
+        self._check_stale_state()
         buy_stock_by_quantity_response: BuyStockResponse = (
             await self._broker.buy_stock_by_quantity(buy_stock_by_quantity_request)
         )
@@ -206,6 +363,7 @@ class Portfolio:
     async def _sell_stock(
         self, sell_stock_by_quantity_request: SellStockByQuantityRequest
     ) -> None:
+        self._check_stale_state()
         sell_stock_by_quantity_response: SellStockResponse = (
             await self._broker.sell_stock_by_quantity(sell_stock_by_quantity_request)
         )
@@ -214,11 +372,22 @@ class Portfolio:
             sell_stock_by_quantity_response.symbol
         ].quantity -= sell_stock_by_quantity_response.quantity
 
+    async def _buy_stock_by_amount(
+        self, buy_stock_by_amount_request: BuyStockByAmountRequest
+    ) -> None:
+        """Buy stock by amount and update the portfolio state."""
+        response = await self._broker.buy_stock_by_amount(buy_stock_by_amount_request)
+        self._allocated_stocks[response.symbol] = AllocatedStock(
+            stock=Stock(symbol=response.symbol, price=response.price),
+            allocation_percentage=self._stock_to_allocate[response.symbol].allocation_percentage,
+            quantity=response.quantity,
+        )
+
     def __repr__(self) -> str:
         return f"""
         Portfolio(
             portfolio_name={self._portfolio_name},
-            initial_investment={self._initial_investment}, 
+            initial_investment={self._initial_investment},
             allocated_stocks={self._allocated_stocks}
         )
         """
