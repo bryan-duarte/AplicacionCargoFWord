@@ -1,8 +1,8 @@
-El punto está en considerar lo NO evidente que envuelve el caso de uso real como lo sería en Fintual como tal, literal lo primero fué un bueeeeeeeeen tiempo en investigar sobre particularidades del negocio y Fintual, hagamos una simulación.
+El punto está en considerar lo NO evidente que envuelve el caso de uso real como lo sería en FWord como tal, literal lo primero fué un bueeeeeeeeen tiempo en investigar sobre particularidades del negocio y FWord, hagamos una simulación.
 
 
 CASO 
-Primer día: Hola Bryan, bienvenido a Fintual te sumaras al equipo que está en la funcionalidad de “Fintual malabarista” que balancea portafolios, vaya y aporte pues.
+Primer día: Hola Bryan, bienvenido a FWord te sumaras al equipo que está en la funcionalidad de “FWord malabarista” que balancea portafolios, vaya y aporte pues.
 
 Todo esto sería en lo que me aportaría a la conversación y en algunos casos detallo mi aproach frente a los puntos.
 
@@ -10,15 +10,15 @@ Razonamiento
 <…deep human thinking mode>
 
 Primeras dudas:
-1- Comisiones del broker. ¿Qué broker usa Fintual?
+1- Comisiones del broker. ¿Qué broker usa FWord?
 2-¿Puedo comprar fracciones de acciones?
-	Fintual usa Alpaca Securities (Buen nombre), que sí permite compra fraccionada, y dice que no cobra comisiones, al parecer tiene una api en condiciones.
+	FWord usa Alpaca Securities (Buen nombre), que sí permite compra fraccionada, y dice que no cobra comisiones, al parecer tiene una api en condiciones.
 3- Impuestos a la renta de utilidades de capital del país Chile, México afectan al caso de uso?
 Claro pues muchacho, SII y SAT todo lo ven
 Opinión mía ante el equipo: Quien activa el feature debe saber el impacto tributario, pero hay que hacerle la vida sencilla respecto a la recopilación de los ingresos y pérdidas obtenidas de estas ventas auto ejecutadas de sus assets.
 
 Adicionales: 
--El mínimo de un asset en Fintual acciones es de 1 dolar.
+-El mínimo de un asset en FWord acciones es de 1 dolar.
 -El tipo de cuenta en el broker probablemente sea de tipo margen, no cash.
 La cuenta de margen permite el "rebalanceo atómico": vender Meta y comprar Apple instantáneamente, usando el dinero de la venta antes de que se liquide oficialmente.
 
@@ -43,7 +43,7 @@ A nivel sistema, al haber un cambio en el atributo precio de una acción, debe d
 
 Que opciones tiene alpaca para no tener que hacer una petición a su endpoint a cada rato ? tiene un webhook que me notifique de algún cambio significativo en el precio de alguna acción?
 
-Alguien tiene la data histórica de cambios de precio que tienen las acciones que tenemos disponibles en el feature? así podríamos definir tiempos de chequeo del balanceo basado en el historico. [-Bryan procede a conseguirse la data en la deepweeb si es que Fintual no la tiene-]
+Alguien tiene la data histórica de cambios de precio que tienen las acciones que tenemos disponibles en el feature? así podríamos definir tiempos de chequeo del balanceo basado en el historico. [-Bryan procede a conseguirse la data en la deepweeb si es que FWord no la tiene-]
 
 Vi que alpaca tiene un websocket para suscribirme a eventos cada 1 minuto
 Pero, según la propuesta de valor del feature vale la pena? sí es que sí, consideremos el costo de escalar eso a nivel servidores segun la cantidad de variedad de assets y de portafolios manejados.

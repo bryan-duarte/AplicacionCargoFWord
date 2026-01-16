@@ -19,7 +19,7 @@ ruff format src
 
 ## Project Overview
 
-This is a Python-based financial portfolio management system demonstrating automatic rebalancing of portfolios based on stock price changes. The system implements an event-driven architecture similar to what might be used in a fintech platform like Fintual.
+This is a Python-based financial portfolio management system demonstrating automatic rebalancing of portfolios based on stock price changes. The system implements an event-driven architecture similar to what might be used in a fintech platform like FWord.
 
 ## Architecture
 
