@@ -1,8 +1,9 @@
 from decimal import Decimal
-from typing import Awaitable, Union
+from typing import Awaitable, Union, Optional
 from uuid import uuid4
 import logging
 import asyncio
+from datetime import datetime, timedelta
 from pydantic import BaseModel, ConfigDict, Field
 from src.broker.broker import (
     BuyStockByAmountRequest,
@@ -92,6 +93,11 @@ class Portfolio:
         self._retail_threshold_usd = retail_threshold_usd if retail_threshold_usd is not None else 25000
         self._rebalance_threshold = rebalance_threshold if rebalance_threshold is not None else Decimal("0.00")
 
+        # Rebalance lock attributes
+        self._is_rebalancing: bool = False
+        self._rebalance_start_time: Optional[datetime] = None
+        self._rebalance_lock_ttl_seconds: int = config.rebalance_lock_ttl_seconds
+
         self._set_stock_to_allocate(config.stocks_to_allocate)
         portfolio_registry.add(self)
 
@@ -133,6 +139,34 @@ class Portfolio:
         """Manually clear the stale state."""
         self._stale = False
         logging.info(f"Alert: Stale state cleared for '{self._portfolio_name}'")
+
+    def _can_acquire_rebalance_lock(self) -> bool:
+        """Check if the rebalance lock can be acquired.
+
+        Returns True if:
+        - No rebalance is currently in progress, OR
+        - The current lock has expired (TTL exceeded)
+
+        If the lock has expired, it will be cleaned up automatically.
+        """
+        if not self._is_rebalancing:
+            return True
+
+        # Check if lock has expired
+        if self._rebalance_start_time is not None:
+            lock_age = datetime.now() - self._rebalance_start_time
+            if lock_age.total_seconds() > self._rebalance_lock_ttl_seconds:
+                # Lock has expired, clean it up
+                logging.warning(
+                    f"Rebalance lock expired for '{self._portfolio_name}' "
+                    f"(age: {lock_age.total_seconds():.1f}s, TTL: {self._rebalance_lock_ttl_seconds}s). "
+                    "Cleaning up stale lock."
+                )
+                self._is_rebalancing = False
+                self._rebalance_start_time = None
+                return True
+
+        return False
 
     async def initialize(self) -> None:
         """
@@ -233,62 +267,85 @@ class Portfolio:
         return buy_operations_list, sell_operations_list
 
     async def rebalance(self) -> None:
-        """Rebalance portfolio with batch support and automatic rollback."""
-        self._check_stale_state()
+        """Rebalance portfolio with batch support and automatic rollback.
 
-        batch_uuid = uuid4()
-
-        buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
-
-        buy_results: list[Union[BuyStockResponse, Exception]] = []
-        sell_results: list[Union[SellStockResponse, Exception]] = []
-        
-        if buy_operations_list:
-            buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
-            
-            for response in buy_results:
-                if isinstance(response, BuyStockResponse):
-                    self._allocated_stocks[response.symbol].quantity += response.quantity
-
-            buy_failures = [
-                failure
-                for failure in buy_results
-                if isinstance(failure, Exception)
-            ]
-
-        if sell_operations_list:
-            sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
-            
-            for response in sell_results:
-                if isinstance(response, SellStockResponse):
-                    self._allocated_stocks[response.symbol].quantity -= response.quantity
-
-            sell_failures = [
-                failure
-                for failure in sell_results
-                if isinstance(failure, Exception)
-            ]
-
-        failures = buy_failures + sell_failures
-
-        if failures:
-            has_successful_operations = any(
-                isinstance(result, (BuyStockResponse, SellStockResponse))
-                for result in (*buy_results, *sell_results)
+        Implements a locking mechanism to prevent concurrent rebalances on the same portfolio.
+        If a rebalance is already in progress, this method will return early with a warning log.
+        """
+        # Check if we can acquire the lock
+        if not self._can_acquire_rebalance_lock():
+            logging.warning(
+                f"Rebalance rejected for '{self._portfolio_name}': "
+                "another rebalance is already in progress"
             )
+            return
 
-            if has_successful_operations:
-                rollback_success = await self._broker.batch_rollback(batch_uuid)
+        # Acquire the lock
+        self._is_rebalancing = True
+        self._rebalance_start_time = datetime.now()
+        logging.info(f"Rebalance lock acquired for '{self._portfolio_name}'")
 
-                if not rollback_success:
-                    self.set_stale_state()
-                    raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
+        try:
+            self._check_stale_state()
 
-                raise PortfolioError(
-                    "Rebalancing failed. Successfully rolled back prior successful operations."
+            batch_uuid = uuid4()
+
+            buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
+
+            buy_results: list[Union[BuyStockResponse, Exception]] = []
+            sell_results: list[Union[SellStockResponse, Exception]] = []
+
+            if buy_operations_list:
+                buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
+
+                for response in buy_results:
+                    if isinstance(response, BuyStockResponse):
+                        self._allocated_stocks[response.symbol].quantity += response.quantity
+
+                buy_failures = [
+                    failure
+                    for failure in buy_results
+                    if isinstance(failure, Exception)
+                ]
+
+            if sell_operations_list:
+                sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
+
+                for response in sell_results:
+                    if isinstance(response, SellStockResponse):
+                        self._allocated_stocks[response.symbol].quantity -= response.quantity
+
+                sell_failures = [
+                    failure
+                    for failure in sell_results
+                    if isinstance(failure, Exception)
+                ]
+
+            failures = buy_failures + sell_failures
+
+            if failures:
+                has_successful_operations = any(
+                    isinstance(result, (BuyStockResponse, SellStockResponse))
+                    for result in (*buy_results, *sell_results)
                 )
 
-            raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
+                if has_successful_operations:
+                    rollback_success = await self._broker.batch_rollback(batch_uuid)
+
+                    if not rollback_success:
+                        self.set_stale_state()
+                        raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
+
+                    raise PortfolioError(
+                        "Rebalancing failed. Successfully rolled back prior successful operations."
+                    )
+
+                raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
+        finally:
+            # Always release the lock, even if an exception occurred
+            self._is_rebalancing = False
+            self._rebalance_start_time = None
+            logging.info(f"Rebalance lock released for '{self._portfolio_name}'")
 
     async def _buy_stock(
         self, buy_stock_by_quantity_request: BuyStockByQuantityRequest

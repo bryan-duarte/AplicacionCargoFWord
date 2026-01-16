@@ -53,6 +53,12 @@ class PortfolioConfig(BaseModel):
         description="List of stocks with their allocation percentages (must sum to 100%)",
     )
 
+    rebalance_lock_ttl_seconds: int = Field(
+        default=21600,
+        gt=0,
+        description="TTL for rebalance lock in seconds (default: 21600 = 6 hours)",
+    )
+
     @field_validator('stocks_to_allocate')
     @classmethod
     def validate_unique_stock_symbols(cls, allocations: list[StockToAllocate]) -> list[StockToAllocate]:
