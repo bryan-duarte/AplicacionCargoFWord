@@ -1,12 +1,9 @@
 from decimal import Decimal
-from functools import partial
 from typing import Awaitable, Union
 from uuid import uuid4
 import logging
 import asyncio
-
 from pydantic import BaseModel, ConfigDict, Field
-from src.broker.broker_dtos import OperationState
 from src.broker.broker import (
     BuyStockByAmountRequest,
     BuyStockByQuantityRequest,
@@ -18,12 +15,11 @@ from src.broker.broker_dtos import BrokerOperation
 from src.broker.broker_interface import Broker
 from src.config.config import settings
 from src.portfolio.errors import PortfolioError, PortfolioInitializationError
+from typing import Optional
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
 from src.portfolio.portfolio_register import portfolio_registry
 from src.stock.stock import Stock
 from src.utils.decimal_utils import quantize_money
-
-__all__ = ['Portfolio', 'PortfolioValue', 'AllocatedStock', 'StockToAllocate']
 
 
 class PortfolioValue(BaseModel):
@@ -74,13 +70,27 @@ class Portfolio:
         self,
         config: PortfolioConfig,
         broker: Broker,
+        *,
+        retail_threshold_usd: Optional[int] = None,
+        rebalance_threshold: Optional[Decimal] = None,
     ):
+        """Initialize a Portfolio with configuration and broker.
+
+        Args:
+            config: Portfolio configuration with name, investment, and stocks
+            broker: Broker instance for executing trades
+            retail_threshold_usd: Threshold for retail classification (default: 25000)
+            rebalance_threshold: Minimum quantity difference to trigger rebalancing (default: 0.00)
+        """
         self._portfolio_name = config.portfolio_name
         self._initial_investment = config.initial_investment
         self._stock_to_allocate: dict[str, StockToAllocate] = {}
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
         self._stale: bool = False
+
+        self._retail_threshold_usd = retail_threshold_usd if retail_threshold_usd is not None else 25000
+        self._rebalance_threshold = rebalance_threshold if rebalance_threshold is not None else Decimal("0.00")
 
         self._set_stock_to_allocate(config.stocks_to_allocate)
         portfolio_registry.add(self)
@@ -98,7 +108,7 @@ class Portfolio:
             (stock.total_value for stock in self._allocated_stocks.values()), Decimal(0)
         )
         total_value = quantize_money(total_value)
-        is_retail = total_value < settings.portfolio.retail_threshold_usd
+        is_retail = total_value < self._retail_threshold_usd
 
         return PortfolioValue(total_value=total_value, is_retail=is_retail)
 
@@ -195,7 +205,7 @@ class Portfolio:
 
             quantity_difference = new_objective_quantity - allocated_stock.quantity
 
-            need_to_rebalance = abs(quantity_difference) > settings.portfolio.rebalance_threshold
+            need_to_rebalance = abs(quantity_difference) > self._rebalance_threshold
             if not need_to_rebalance:
                 continue
 

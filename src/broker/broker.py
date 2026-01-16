@@ -17,21 +17,78 @@ from src.broker.errors import (
 )
 from src.utils.fake_market import NASDAQ
 from src.utils.decimal_utils import quantize_quantity, quantize_money
-from src.config.config import settings
-from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
+from decimal import Decimal
 import asyncio
 import logging
 import random
 
 
 class BanChileBroker(Broker):
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        min_money: Optional[Decimal] = None,
+        max_money: Optional[Decimal] = None,
+        min_quantity_buy: Optional[Decimal] = None,
+        min_quantity_sell: Optional[Decimal] = None,
+        max_quantity: Optional[Decimal] = None,
+        min_delay_seconds: int = 1,
+        max_delay_seconds: int = 2,
+        batch_retry_delay_seconds: int = 1,
+        max_retries: int = 3,
+    ):
+        """Initialize BanChileBroker with configurable limits.
+
+        Args:
+            min_money: Minimum monetary value for operations (default: 0.01)
+            max_money: Maximum monetary value for operations (default: 10000000.00)
+            min_quantity_buy: Minimum buy quantity (default: 0.01)
+            min_quantity_sell: Minimum sell quantity (default: 0.000001)
+            max_quantity: Maximum quantity per operation (default: 1000000.000000000)
+            min_delay_seconds: Minimum simulated network latency in seconds (default: 1)
+            max_delay_seconds: Maximum simulated network latency in seconds (default: 2)
+            batch_retry_delay_seconds: Delay between rollback retries in seconds (default: 1)
+            max_retries: Maximum retry attempts for rollback operations (default: 3)
+        """
         logging.info(
             "BanChileBroker, the best broker in the world, with the lower fees - initialized"
         )
         self._batch_registry: dict[UUID, dict[UUID, BatchOperationEntry]] = {}
+
+        self._min_money = min_money if min_money is not None else Decimal("0.01")
+        self._max_money = max_money if max_money is not None else Decimal("10000000.00")
+
+        self._min_quantity_buy = min_quantity_buy if min_quantity_buy is not None else Decimal("0.01")
+        self._min_quantity_sell = min_quantity_sell if min_quantity_sell is not None else Decimal("0.000001")
+        self._max_quantity = max_quantity if max_quantity is not None else Decimal("1000000.000000000")
+
+        self._min_delay_seconds = min_delay_seconds
+        self._max_delay_seconds = max_delay_seconds
+
+        self._batch_retry_delay_seconds = batch_retry_delay_seconds
+        self._max_retries = max_retries
+
+    @property
+    def min_money(self) -> Decimal:
+        return self._min_money
+
+    @property
+    def max_money(self) -> Decimal:
+        return self._max_money
+
+    @property
+    def min_quantity_buy(self) -> Decimal:
+        return self._min_quantity_buy
+
+    @property
+    def min_quantity_sell(self) -> Decimal:
+        return self._min_quantity_sell
+
+    @property
+    def max_quantity(self) -> Decimal:
+        return self._max_quantity
 
     def _register_operation(
         self,
@@ -101,7 +158,7 @@ class BanChileBroker(Broker):
                 )
 
             await asyncio.sleep(
-                random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds)
+                random.randint(self._min_delay_seconds, self._max_delay_seconds)
             )
 
             response = BuyStockResponse(
@@ -141,7 +198,7 @@ class BanChileBroker(Broker):
                 )
 
             await asyncio.sleep(
-                random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds)
+                random.randint(self._min_delay_seconds, self._max_delay_seconds)
             )
 
             response = BuyStockResponse(
@@ -181,7 +238,7 @@ class BanChileBroker(Broker):
                 )
 
             await asyncio.sleep(
-                random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds)
+                random.randint(self._min_delay_seconds, self._max_delay_seconds)
             )
 
             response = SellStockResponse(
@@ -221,7 +278,7 @@ class BanChileBroker(Broker):
                 )
 
             await asyncio.sleep(
-                random.randint(settings.broker.min_delay_seconds, settings.broker.max_delay_seconds)
+                random.randint(self._min_delay_seconds, self._max_delay_seconds)
             )
 
             response = SellStockResponse(
@@ -286,7 +343,7 @@ class BanChileBroker(Broker):
                         f"{entry.operation_uuid}: {e}"
                     )
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(settings.broker.batch_retry_delay_seconds)
+                        await asyncio.sleep(self._batch_retry_delay_seconds)
 
             if not rollback_success:
                 all_rollback_success = False
@@ -295,7 +352,6 @@ class BanChileBroker(Broker):
                     f"after {max_retries} attempts"
                 )
 
-        # Clean up batch registry after rollback
         del self._batch_registry[batch_uuid]
 
         return all_rollback_success

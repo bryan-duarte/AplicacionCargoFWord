@@ -3,12 +3,30 @@ from src.event_bus.event_dtos import StockPriceChangeEvent
 from src.config.config import settings
 from src.stock.errors import InvalidSymbolError, InvalidPriceError
 from decimal import Decimal
+from typing import Optional
 import re
 
 
 class Stock:
-    def __init__(self, symbol: str, price: Decimal):
+    def __init__(
+        self,
+        symbol: str,
+        price: Decimal,
+        *,
+        min_price: Optional[Decimal] = None,
+        max_price: Optional[Decimal] = None,
+    ):
+        """Initialize a Stock with symbol and price.
+
+        Args:
+            symbol: Stock symbol (must be exactly 4 uppercase letters)
+            price: Stock price (must be within min/max price limits)
+            min_price: Minimum allowed price (default: 0.01)
+            max_price: Maximum allowed price (default: 1000000.00)
+        """
         self._symbol = self._validate_symbol(symbol)
+        self._min_price = min_price if min_price is not None else Decimal("0.01")
+        self._max_price = max_price if max_price is not None else settings.stock.max_price
         self._price = self._validate_price(price)
 
     def _validate_symbol(self, symbol: str) -> str:
@@ -33,9 +51,14 @@ class Stock:
         if not isinstance(price, Decimal):
             price = Decimal(str(price))
 
-        if price > settings.stock.max_price:
+        if price < self._min_price:
             raise InvalidPriceError(
-                f"Price must be at most {settings.stock.max_price}, got {price}"
+                f"Price must be at least {self._min_price}, got {price}"
+            )
+
+        if price > self._max_price:
+            raise InvalidPriceError(
+                f"Price must be at most {self._max_price}, got {price}"
             )
 
         return price
@@ -49,7 +72,7 @@ class Stock:
         return self._price
 
     def current_price(self, new_price: Decimal):
-        self._price = new_price
+        self._price = self._validate_price(new_price)
 
     @classmethod
     async def set_price_alert(cls, symbol: str, new_price: Decimal):

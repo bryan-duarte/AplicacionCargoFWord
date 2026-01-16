@@ -7,6 +7,14 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 from src.config.config import settings
 
+# Default broker limits (can be overridden when creating DTOs)
+_DEFAULT_MIN_MONEY = Decimal("0.01")
+_DEFAULT_MAX_MONEY = Decimal("10000000.00")
+_DEFAULT_MIN_QUANTITY_BUY = Decimal("0.01")
+_DEFAULT_MIN_QUANTITY_SELL = Decimal("0.000001")
+_DEFAULT_MAX_QUANTITY = Decimal("1000000.000000000")
+
+
 class OperationType(Enum):
     BUY = "BUY"
     SELL = "SELL"
@@ -61,11 +69,11 @@ class BuyStockByAmountRequest(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker.min_money,
-        le=settings.broker.max_money,
+        ge=_DEFAULT_MIN_MONEY,
+        le=_DEFAULT_MAX_MONEY,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Amount of money to buy (USD, max $10M)"
+        description="Amount of money to buy (USD, max $10M)",
     )
 
     def __repr__(self) -> str:
@@ -80,11 +88,11 @@ class BuyStockByQuantityRequest(BrokerOperation):
     quantity: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker.min_quantity_buy,
-        le=settings.broker.max_quantity,
+        ge=_DEFAULT_MIN_QUANTITY_BUY,
+        le=_DEFAULT_MAX_QUANTITY,
         max_digits=settings.shared.quantity_max_digits,
         decimal_places=settings.shared.quantity_decimal_precision,
-        description="Quantity of the stock to buy (supports fractional shares)"
+        description="Quantity of the stock to buy (supports fractional shares)",
     )
 
     def __repr__(self) -> str:
@@ -142,11 +150,11 @@ class SellStockByAmountRequest(BrokerOperation):
     amount: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker.min_money,
-        le=settings.broker.max_money,
+        ge=_DEFAULT_MIN_MONEY,
+        le=_DEFAULT_MAX_MONEY,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Amount of money to sell USD"
+        description="Amount of money to sell USD",
     )
 
     def __repr__(self) -> str:
@@ -160,11 +168,11 @@ class SellStockByQuantityRequest(BrokerOperation):
     quantity: Decimal = Field(
         ...,
         gt=0,
-        ge=settings.broker.min_quantity_sell,
-        le=settings.broker.max_quantity,
+        ge=_DEFAULT_MIN_QUANTITY_SELL,
+        le=_DEFAULT_MAX_QUANTITY,
         max_digits=settings.shared.quantity_max_digits,
         decimal_places=settings.shared.quantity_decimal_precision,
-        description="Quantity of the stock to sell (supports fractional shares)"
+        description="Quantity of the stock to sell (supports fractional shares)",
     )
 
     def __repr__(self) -> str:

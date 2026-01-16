@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, model_valida
 from src.config.config import settings
 from src.stock.stock import Stock
 
+_DEFAULT_MINIMUM_INVESTMENT_USD = 1
+
 
 class StockToAllocate(BaseModel):
     stock: Stock
@@ -23,7 +25,7 @@ class StockToAllocate(BaseModel):
 
 
 class PortfolioConfig(BaseModel):
-    
+
     model_config = ConfigDict(
         frozen=True,
         arbitrary_types_allowed=True,
@@ -38,7 +40,7 @@ class PortfolioConfig(BaseModel):
     initial_investment: Decimal = Field(
         ...,
         gt=Decimal("0"),
-        ge=Decimal(str(settings.portfolio.minimum_investment_usd)),
+        ge=Decimal(str(_DEFAULT_MINIMUM_INVESTMENT_USD)),
         le=settings.shared.money_max_value,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,

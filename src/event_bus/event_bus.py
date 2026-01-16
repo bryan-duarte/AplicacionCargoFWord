@@ -1,12 +1,6 @@
 import asyncio
-from enum import Enum
-from datetime import datetime
 from typing import Callable
-import logging
-from pydantic import BaseModel, Field
-from src.config.config import settings
-from src.portfolio.portfolio_register import portfolio_registry
-from decimal import Decimal
+from pydantic import BaseModel
 from src.event_bus.event_dtos import EventType
 
 

@@ -1,9 +1,5 @@
 import asyncio
-from enum import Enum
-from datetime import datetime
-from typing import Callable
 import logging
-from src.config.config import settings
 from src.portfolio.portfolio_register import portfolio_registry
 from decimal import Decimal
 from src.event_bus.event_dtos import (
@@ -13,12 +9,15 @@ from src.event_bus.event_dtos import (
 )
 from src.event_bus.event_bus import bus
 
+# Default threshold for price change alerts (0.00 means always trigger rebalancing)
+_DEFAULT_PRICE_CHANGE_ALERT_THRESHOLD_PERCENT = Decimal("0.00")
+
 
 async def stock_price_change_handler(event: StockPriceChangeEvent):
     logging.info(f"Stock price changed Alert")
     have_significant_change = (
         abs(event.new_price - event.current_price) / event.current_price
-        > settings.portfolio.price_change_alert_threshold_percent
+        > _DEFAULT_PRICE_CHANGE_ALERT_THRESHOLD_PERCENT
     )
     if have_significant_change:
         await bus.emit(
