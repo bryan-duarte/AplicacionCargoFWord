@@ -328,12 +328,26 @@ class BanChileBroker(Broker):
                     rollback_request = entry.response.to_rollback_request()
 
                     if isinstance(entry.response, BuyStockResponse):
+                        logging.info(
+                            f"Rolling back BUY operation: symbol={entry.response.symbol}, "
+                            f"quantity={entry.response.quantity}, "
+                            f"amount={entry.response.amount}"
+                        )
                         await self.sell_stock_by_quantity(rollback_request)
                     elif isinstance(entry.response, SellStockResponse):
+                        logging.info(
+                            f"Rolling back SELL operation: symbol={entry.response.symbol}, "
+                            f"quantity={entry.response.quantity}, "
+                            f"amount={entry.response.amount}"
+                        )
                         await self.buy_stock_by_quantity(rollback_request)
 
                     rollback_success = True
                     entry.state = OperationState.ROLLED_BACK
+                    logging.info(
+                        f"Rollback successful for operation {entry.operation_uuid} "
+                        f"(symbol={entry.response.symbol})"
+                    )
                     break
 
                 except Exception as e:
@@ -351,6 +365,12 @@ class BanChileBroker(Broker):
                     f"Failed to rollback operation {entry.operation_uuid} "
                     f"after {max_retries} attempts"
                 )
+
+        logging.info(
+            f"Batch rollback completed for {batch_uuid}: "
+            f"{len(successful_operations)} operations processed, "
+            f"{'all successful' if all_rollback_success else 'some failed'}"
+        )
 
         del self._batch_registry[batch_uuid]
 

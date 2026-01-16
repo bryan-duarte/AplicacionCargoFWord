@@ -20,7 +20,7 @@ from typing import Optional
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
 from src.portfolio.portfolio_register import portfolio_registry
 from src.stock.stock import Stock
-from src.utils.decimal_utils import quantize_money
+from src.utils.decimal_utils import quantize_money, quantize_quantity
 
 
 class PortfolioValue(BaseModel):
@@ -109,6 +109,23 @@ class Portfolio:
     def allocated_stocks(self) -> dict[str, AllocatedStock]:
         return self._allocated_stocks
 
+    @property
+    def is_locked(self) -> bool:
+        """Check if portfolio is currently locked (rebalancing in progress)."""
+        return self._is_rebalancing
+
+    @property
+    def is_stale(self) -> bool:
+        """Check if portfolio is in stale state."""
+        return self._stale
+
+    @property
+    def lock_age_seconds(self) -> Optional[float]:
+        """Get the age of the current lock in seconds, or None if not locked."""
+        if self._rebalance_start_time is None:
+            return None
+        return (datetime.now() - self._rebalance_start_time).total_seconds()
+
     def get_total_value(self) -> PortfolioValue:
         total_value = sum(
             (stock.total_value for stock in self._allocated_stocks.values()), Decimal(0)
@@ -125,6 +142,10 @@ class Portfolio:
     def _check_stale_state(self) -> None:
         """Raise error if portfolio is in stale state."""
         if self._stale:
+            logging.warning(
+                f"Rebalance rejected for '{self._portfolio_name}': "
+                "portfolio is in stale state. Manual recovery required."
+            )
             raise PortfolioError(
                 f"Portfolio '{self._portfolio_name}' is in stale state. "
                 "Manual recovery required. Call clear_stale_state() after verification."
@@ -233,7 +254,7 @@ class Portfolio:
             new_objective_total_value = (
                 portfolio_total_value * allocated_stock.allocation_percentage
             )
-            new_objective_quantity = (
+            new_objective_quantity = quantize_quantity(
                 new_objective_total_value / allocated_stock.stock.price
             )
 
@@ -248,7 +269,7 @@ class Portfolio:
                     broker.buy_stock_by_quantity(
                         BuyStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
-                            quantity=abs(quantity_difference),
+                            quantity=quantize_quantity(abs(quantity_difference)),
                             batch_uuid=batch_uuid,
                         )
                     )
@@ -258,7 +279,7 @@ class Portfolio:
                     broker.sell_stock_by_quantity(
                         SellStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
-                            quantity=abs(quantity_difference),
+                            quantity=quantize_quantity(abs(quantity_difference)),
                             batch_uuid=batch_uuid,
                         )
                     )
@@ -267,12 +288,8 @@ class Portfolio:
         return buy_operations_list, sell_operations_list
 
     async def rebalance(self) -> None:
-        """Rebalance portfolio with batch support and automatic rollback.
+        self._check_stale_state()
 
-        Implements a locking mechanism to prevent concurrent rebalances on the same portfolio.
-        If a rebalance is already in progress, this method will return early with a warning log.
-        """
-        # Check if we can acquire the lock
         if not self._can_acquire_rebalance_lock():
             logging.warning(
                 f"Rebalance rejected for '{self._portfolio_name}': "
@@ -280,16 +297,12 @@ class Portfolio:
             )
             return
 
-        # Acquire the lock
         self._is_rebalancing = True
         self._rebalance_start_time = datetime.now()
         logging.info(f"Rebalance lock acquired for '{self._portfolio_name}'")
 
         try:
-            self._check_stale_state()
-
             batch_uuid = uuid4()
-
             buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
 
             buy_results: list[Union[BuyStockResponse, Exception]] = []
@@ -298,29 +311,11 @@ class Portfolio:
             if buy_operations_list:
                 buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
 
-                for response in buy_results:
-                    if isinstance(response, BuyStockResponse):
-                        self._allocated_stocks[response.symbol].quantity += response.quantity
-
-                buy_failures = [
-                    failure
-                    for failure in buy_results
-                    if isinstance(failure, Exception)
-                ]
-
             if sell_operations_list:
                 sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
 
-                for response in sell_results:
-                    if isinstance(response, SellStockResponse):
-                        self._allocated_stocks[response.symbol].quantity -= response.quantity
-
-                sell_failures = [
-                    failure
-                    for failure in sell_results
-                    if isinstance(failure, Exception)
-                ]
-
+            buy_failures = [failure for failure in buy_results if isinstance(failure, Exception)]
+            sell_failures = [failure for failure in sell_results if isinstance(failure, Exception)]
             failures = buy_failures + sell_failures
 
             if failures:
@@ -336,13 +331,19 @@ class Portfolio:
                         self.set_stale_state()
                         raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
 
-                    raise PortfolioError(
-                        "Rebalancing failed. Successfully rolled back prior successful operations."
-                    )
+                    raise PortfolioError("Rebalancing failed. Rolled back partial executions in broker.")
 
                 raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
+
+            for response in buy_results:
+                if isinstance(response, BuyStockResponse):
+                    self._allocated_stocks[response.symbol].quantity += response.quantity
+
+            for response in sell_results:
+                if isinstance(response, SellStockResponse):
+                    self._allocated_stocks[response.symbol].quantity -= response.quantity
+
         finally:
-            # Always release the lock, even if an exception occurred
             self._is_rebalancing = False
             self._rebalance_start_time = None
             logging.info(f"Rebalance lock released for '{self._portfolio_name}'")
