@@ -390,13 +390,6 @@ FWord-software-engineer-apply/
 └── pytest.ini                   # Configuración de tests
 ```
 
----
-
-## 📄 Licencia
-
-Este proyecto es parte del proceso de selección para el cargo de Desarrollador de Software en FWord.
-
----
 
 <div align="center">
 
