@@ -1,6 +1,12 @@
+from decimal import Decimal
 from functools import partial
-from src.stock.stock import Stock
+from typing import Awaitable, Union
+from uuid import uuid4
+import logging
+import asyncio
+
 from pydantic import BaseModel, ConfigDict, Field
+from src.broker.broker_dtos import OperationState
 from src.broker.broker import (
     BuyStockByAmountRequest,
     BuyStockByQuantityRequest,
@@ -8,15 +14,14 @@ from src.broker.broker import (
     BuyStockResponse,
     SellStockResponse,
 )
+from src.broker.broker_dtos import BrokerOperation
 from src.broker.broker_interface import Broker
-import asyncio
-from typing import Awaitable
 from src.config.config import settings
-from src.portfolio.portfolio_register import portfolio_registry
-from src.portfolio.errors import PortfolioInitializationError
+from src.portfolio.errors import PortfolioError, PortfolioInitializationError
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
+from src.portfolio.portfolio_register import portfolio_registry
+from src.stock.stock import Stock
 from src.utils.decimal_utils import quantize_money
-from decimal import Decimal
 
 __all__ = ['Portfolio', 'PortfolioValue', 'AllocatedStock', 'StockToAllocate']
 
@@ -75,6 +80,7 @@ class Portfolio:
         self._stock_to_allocate: dict[str, StockToAllocate] = {}
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
+        self._stale: bool = False
 
         self._set_stock_to_allocate(config.stocks_to_allocate)
         portfolio_registry.add(self)
@@ -100,55 +106,84 @@ class Portfolio:
         for stock in stocks_to_allocate:
             self._stock_to_allocate[stock.stock.symbol] = stock
 
+    def _check_stale_state(self) -> None:
+        """Raise error if portfolio is in stale state."""
+        if self._stale:
+            raise PortfolioError(
+                f"Portfolio '{self._portfolio_name}' is in stale state. "
+                "Manual recovery required. Call clear_stale_state() after verification."
+            )
+    
+    def set_stale_state(self) -> None:
+        """Manually set the stale state."""
+        self._stale = True
+        logging.info(f"Alert: Stale state set for '{self._portfolio_name}'")
+
+    def clear_stale_state(self) -> None:
+        """Manually clear the stale state."""
+        self._stale = False
+        logging.info(f"Alert: Stale state cleared for '{self._portfolio_name}'")
+
     async def initialize(self) -> None:
         """
-        Initialize portfolio by buying all allocated stocks with retry logic.
-
-        Implements idempotency by verifying operation status and retrying failed
-        operations. Uses exponential backoff for retries. Fails completely if any
-        operation cannot succeed after all retry attempts (atomic operation).
+        Initialize portfolio with batch support and automatic rollback.
 
         Raises:
-            PortfolioInitializationError: If any stock purchase fails permanently
+            PortfolioInitializationError: If initialization fails
+            PortfolioError: If portfolio is in stale state
         """
-        buy_tasks: list[Awaitable[BuyStockResponse]] = []
-        for stock in self._stock_to_allocate.values():
-            buy_tasks.append(
-                self._buy_stock_by_amount(
-                    BuyStockByAmountRequest(
-                        symbol=stock.stock.symbol,
-                        amount=self._initial_investment * stock.allocation_percentage,
-                    )
-                )
-            )
+        self._check_stale_state()
+        batch_uuid = uuid4()
 
-        results = await asyncio.gather(*buy_tasks, return_exceptions=True)
+        tasks_by_symbol: dict[str, Awaitable[BuyStockResponse]] = {}
+        for stock in self._stock_to_allocate.values():
+            request = BuyStockByAmountRequest(
+                symbol=stock.stock.symbol,
+                amount=self._initial_investment * stock.allocation_percentage,
+                batch_uuid=batch_uuid,
+            )
+            tasks_by_symbol[request.symbol] = self._buy_stock_by_amount(request)
+
+        results_list: list[Union[BrokerOperation, Exception]] = await asyncio.gather(
+            *tasks_by_symbol.values(), return_exceptions=True
+        )
 
         failed_operations = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                symbol = list(self._stock_to_allocate.keys())[i]
-                failed_operations.append(f"{symbol}: {str(result)}")
+        failed_operations.extend(
+            f"{symbol}: {result}"
+            for symbol, result in zip(tasks_by_symbol, results_list)
+            if isinstance(result, Exception)
+        )
 
         if failed_operations:
+            rollback_success = await self._broker.batch_rollback(batch_uuid)
+
+            if not rollback_success:
+                self.set_stale_state()
+                raise PortfolioInitializationError(
+                        f"Initialization failed. Rollback also failed. Portfolio is in stale state.",
+                        failed_operations=failed_operations,
+                    )
+
             raise PortfolioInitializationError(
-                f"Portfolio initialization failed. {len(failed_operations)} operations failed: "
-                + "; ".join(failed_operations),
-                failed_operations=failed_operations
+                f"All {len(failed_operations)} operations failed: " + "; ".join(failed_operations),
+                failed_operations=failed_operations,
             )
 
     def update_allocated_stock_price(self, symbol: str, price: Decimal) -> None:
         self._allocated_stocks[symbol].stock.current_price(price)
 
-    def _get_balance_operations(
+    def _get_balance_operations_batch(
         self,
+        batch_uuid,
     ) -> tuple[list[Awaitable[BuyStockResponse]], list[Awaitable[SellStockResponse]]]:
+        """Get balance operations with batch UUID included."""
+        
+        broker = self._broker
         portfolio_total_value = self.get_total_value().total_value
 
         buy_operations_list: list[Awaitable[BuyStockResponse]] = []
         sell_operations_list: list[Awaitable[SellStockResponse]] = []
-
-        broker = self._broker
 
         for allocated_stock in self._allocated_stocks.values():
             new_objective_total_value = (
@@ -164,49 +199,91 @@ class Portfolio:
             if not need_to_rebalance:
                 continue
 
-            need_to_buy = quantity_difference > 0
-            if need_to_buy:
+            if quantity_difference > 0:  # Need to buy
                 buy_operations_list.append(
                     broker.buy_stock_by_quantity(
                         BuyStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
                             quantity=abs(quantity_difference),
+                            batch_uuid=batch_uuid,
                         )
                     )
                 )
-
-            need_to_sell = quantity_difference < 0
-            if need_to_sell:
+            elif quantity_difference < 0:  # Need to sell
                 sell_operations_list.append(
                     broker.sell_stock_by_quantity(
                         SellStockByQuantityRequest(
                             symbol=allocated_stock.stock.symbol,
                             quantity=abs(quantity_difference),
+                            batch_uuid=batch_uuid,
                         )
                     )
                 )
+
         return buy_operations_list, sell_operations_list
 
     async def rebalance(self) -> None:
-        buy_operations_list, sell_operations_list = self._get_balance_operations()
+        """Rebalance portfolio with batch support and automatic rollback."""
+        self._check_stale_state()
 
+        batch_uuid = uuid4()
+
+        buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
+
+        buy_results: list[Union[BuyStockResponse, Exception]] = []
+        sell_results: list[Union[SellStockResponse, Exception]] = []
+        
         if buy_operations_list:
-            buy_executed_operations: list[BuyStockResponse] = await asyncio.gather(
-                *buy_operations_list
-            )
-            for response in buy_executed_operations:
-                self._allocated_stocks[response.symbol].quantity += response.quantity
+            buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
+            
+            for response in buy_results:
+                if isinstance(response, BuyStockResponse):
+                    self._allocated_stocks[response.symbol].quantity += response.quantity
+
+            buy_failures = [
+                failure
+                for failure in buy_results
+                if isinstance(failure, Exception)
+            ]
 
         if sell_operations_list:
-            sell_executed_operations: list[SellStockResponse] = await asyncio.gather(
-                *sell_operations_list
+            sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
+            
+            for response in sell_results:
+                if isinstance(response, SellStockResponse):
+                    self._allocated_stocks[response.symbol].quantity -= response.quantity
+
+            sell_failures = [
+                failure
+                for failure in sell_results
+                if isinstance(failure, Exception)
+            ]
+
+        failures = buy_failures + sell_failures
+
+        if failures:
+            has_successful_operations = any(
+                isinstance(result, (BuyStockResponse, SellStockResponse))
+                for result in (*buy_results, *sell_results)
             )
-            for response in sell_executed_operations:
-                self._allocated_stocks[response.symbol].quantity -= response.quantity
+
+            if has_successful_operations:
+                rollback_success = await self._broker.batch_rollback(batch_uuid)
+
+                if not rollback_success:
+                    self.set_stale_state()
+                    raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
+
+                raise PortfolioError(
+                    "Rebalancing failed. Successfully rolled back prior successful operations."
+                )
+
+            raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
 
     async def _buy_stock(
         self, buy_stock_by_quantity_request: BuyStockByQuantityRequest
     ) -> None:
+        self._check_stale_state()
         buy_stock_by_quantity_response: BuyStockResponse = (
             await self._broker.buy_stock_by_quantity(buy_stock_by_quantity_request)
         )
@@ -218,6 +295,7 @@ class Portfolio:
     async def _sell_stock(
         self, sell_stock_by_quantity_request: SellStockByQuantityRequest
     ) -> None:
+        self._check_stale_state()
         sell_stock_by_quantity_response: SellStockResponse = (
             await self._broker.sell_stock_by_quantity(sell_stock_by_quantity_request)
         )

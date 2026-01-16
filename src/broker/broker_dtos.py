@@ -1,21 +1,39 @@
 """Broker operation DTOs."""
-from pydantic import BaseModel, Field
 from datetime import datetime
-from enum import Enum
 from decimal import Decimal
+from enum import Enum
+from typing import Optional, Union
 from uuid import UUID, uuid4
+from pydantic import BaseModel, Field
 from src.config.config import settings
-
 
 class OperationType(Enum):
     BUY = "BUY"
     SELL = "SELL"
 
-
 class OperationStatus(Enum):
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
 
+class OperationState(Enum):
+    """States for batch operation tracking."""
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    ERROR = "ERROR"
+    ROLLED_BACK = "ROLLED_BACK"
+
+class BatchOperationEntry(BaseModel):
+    """Entry in broker's internal batch registry."""
+    operation_uuid: UUID
+    operation_schema: Union[
+        "BuyStockByAmountRequest",
+        "BuyStockByQuantityRequest",
+        "SellStockByAmountRequest",
+        "SellStockByQuantityRequest",
+    ]
+    state: OperationState
+    response: Optional[Union["BuyStockResponse", "SellStockResponse"]] = None
+    rollback_attempt: int = 0
 
 class BrokerOperation(BaseModel):
     date: datetime = datetime.now()
@@ -23,7 +41,15 @@ class BrokerOperation(BaseModel):
         ...,
         min_length=settings.stock.symbol_min_length,
         max_length=settings.stock.symbol_max_length,
-        description="Symbol of the stock"
+        description="Symbol of the stock",
+    )
+    batch_uuid: Optional[UUID] = Field(
+        default=None,
+        description="Batch UUID for grouping atomic operations",
+    )
+    rollback: bool = Field(
+        default=False,
+        description="Whether this is a rollback operation",
     )
 
 
@@ -78,22 +104,31 @@ class BuyStockResponse(BrokerOperation):
         gt=0,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Amount of money spent USD"
+        description="Amount of money spent USD",
     )
     price: Decimal = Field(
         ...,
         gt=0,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Price per share USD"
+        description="Price per share USD",
     )
     quantity: Decimal = Field(
         ...,
         gt=0,
         max_digits=settings.shared.quantity_max_digits,
         decimal_places=settings.shared.quantity_decimal_precision,
-        description="Quantity of shares purchased"
+        description="Quantity of shares purchased",
     )
+
+    def to_rollback_request(self) -> "SellStockByQuantityRequest":
+        """Generate a sell request to rollback this buy operation."""
+        return SellStockByQuantityRequest(
+            symbol=self.symbol,
+            quantity=self.quantity,
+            batch_uuid=self.batch_uuid,
+            rollback=True,
+        )
 
     def __repr__(self) -> str:
         return f"BuyStockResponse(symbol={self.symbol}, amount={self.amount}, price={self.price}, quantity={self.quantity})"
@@ -117,7 +152,6 @@ class SellStockByAmountRequest(BrokerOperation):
     def __repr__(self) -> str:
         return f"SellStockRequest(symbol={self.symbol}, amount={self.amount})"
 
-
 class SellStockByQuantityRequest(BrokerOperation):
     uuid: UUID = Field(
         default_factory=uuid4, description="Unique identifier for the operation"
@@ -136,7 +170,6 @@ class SellStockByQuantityRequest(BrokerOperation):
     def __repr__(self) -> str:
         return f"SellStockRequest(symbol={self.symbol}, quantity={self.quantity})"
 
-
 class SellStockResponse(BrokerOperation):
     uuid: UUID
     operation_type: OperationType = OperationType.SELL
@@ -150,22 +183,31 @@ class SellStockResponse(BrokerOperation):
         gt=0,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Amount of money received (USD)"
+        description="Amount of money received (USD)",
     )
     price: Decimal = Field(
         ...,
         gt=0,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Price per share (USD)"
+        description="Price per share (USD)",
     )
     quantity: Decimal = Field(
         ...,
         gt=0,
         max_digits=settings.shared.quantity_max_digits,
         decimal_places=settings.shared.quantity_decimal_precision,
-        description="Quantity of shares sold"
+        description="Quantity of shares sold",
     )
+
+    def to_rollback_request(self) -> "BuyStockByQuantityRequest":
+        """Generate a buy request to rollback this sell operation."""
+        return BuyStockByQuantityRequest(
+            symbol=self.symbol,
+            quantity=self.quantity,
+            batch_uuid=self.batch_uuid,
+            rollback=True,
+        )
 
     def __repr__(self) -> str:
         return f"SellStockResponse(symbol={self.symbol}, amount={self.amount}, price={self.price}, quantity={self.quantity})"

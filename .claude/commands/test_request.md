@@ -106,15 +106,18 @@ Based on the clarified request, choose the appropriate workflow:
 
 **Trigger**: User starting a new feature or project
 
-1. **Research**: Read relevant code and documentation
-2. **Plan**: Use `test-reviewer` to create strategy:
+1. **Research**: Read relevant code and documentation with many explore Paralel Tasks
+2. **Plan**: Use the `test-reviewer` subagent to create strategy <THIS IS MANDATORY!!>
    ```
-   Use the test-reviewer agent to plan the testing strategy for [feature]
-   Consider: unit tests, integration tests, edge cases, coverage targets
+   Use the test-reviewer subagent to plan the testing strategy for [feature]
+   Consider: unit tests, integration tests, edge cases
    ```
 
 3. **Present**: Share the plan with the user for approval
-4. **Execute** (if approved): Use `python-test-writer` to implement
+4. **Execute** (if approved): Use `python-test-writer` subagent to implement
+   ```
+   Use the python-test-writer subagent to implement the testing strategy for [feature]
+   ```
 
 #### Workflow D: Fix Failing Tests
 

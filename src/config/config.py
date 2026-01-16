@@ -51,6 +51,9 @@ class BrokerSettings(BaseModel):
     max_quantity: Decimal = Field(default=Decimal("1000000.000000000"), description="Maximum quantity")
     min_delay_seconds: int = Field(default=1, ge=0, le=60, description="Minimum latency (seconds)")
     max_delay_seconds: int = Field(default=2, ge=0, le=60, description="Maximum latency (seconds)")
+    batch_max_retries: int = Field(default=3, ge=1, le=10, description="Max retry attempts for rollback operations")
+    batch_retry_delay_seconds: int = Field(default=1, ge=0, le=60, description="Delay between rollback retries (seconds)")
+    batch_registry_max_size: int = Field(default=1000, ge=1, description="Maximum batches to track in registry")
 
 
 class PortfolioSettings(BaseModel):
