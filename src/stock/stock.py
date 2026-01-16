@@ -1,10 +1,11 @@
-from src.event_bus.event_bus import bus, EventType
-from src.event_bus.event_dtos import StockPriceChangeEvent
 from src.config.config import settings
 from src.stock.errors import InvalidSymbolError, InvalidPriceError
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import re
+
+if TYPE_CHECKING:
+    from src.utils.fake_market import FakeMarket
 
 
 class Stock:
@@ -13,6 +14,7 @@ class Stock:
         symbol: str,
         price: Decimal,
         *,
+        market: Optional["FakeMarket"] = None,
         min_price: Optional[Decimal] = None,
         max_price: Optional[Decimal] = None,
     ):
@@ -21,6 +23,7 @@ class Stock:
         Args:
             symbol: Stock symbol (must be exactly 4 uppercase letters)
             price: Stock price (must be within min/max price limits)
+            market: Optional reference to the market this stock belongs to
             min_price: Minimum allowed price (default: 0.01)
             max_price: Maximum allowed price (default: 1000000.00)
         """
@@ -28,6 +31,7 @@ class Stock:
         self._min_price = min_price if min_price is not None else Decimal("0.01")
         self._max_price = max_price if max_price is not None else settings.stock.max_price
         self._price = self._validate_price(price)
+        self._market = market
 
     def _validate_symbol(self, symbol: str) -> str:
         """Validate that symbol is exactly 4 uppercase letters."""
@@ -71,24 +75,14 @@ class Stock:
     def price(self) -> Decimal:
         return self._price
 
-    def current_price(self, new_price: Decimal):
+    def current_price(self, new_price: Decimal) -> None:
+        """Update the stock price.
+
+        Note: No explicit sync with market needed because FakeMarket
+        maintains a direct reference to this Stock object.
+        Changes are reflected automatically.
+        """
         self._price = self._validate_price(new_price)
-
-    @classmethod
-    async def set_price_alert(cls, symbol: str, new_price: Decimal):
-        from src.utils.fake_market import NASDAQ
-
-        if not isinstance(new_price, Decimal):
-            new_price = Decimal(str(new_price))
-
-        current_price = NASDAQ.get(symbol).price
-        NASDAQ.get(symbol).current_price(new_price)
-        await bus.emit(
-            EventType.STOCK_PRICE_CHANGE,
-            StockPriceChangeEvent(
-                new_price=new_price, symbol=symbol, current_price=current_price
-            ),
-        )
 
     def __repr__(self) -> str:
         return f"Stock(symbol={self._symbol}, price={self._price})"
