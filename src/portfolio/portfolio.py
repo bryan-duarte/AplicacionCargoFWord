@@ -3,7 +3,7 @@ from typing import Awaitable, Union, Optional
 from uuid import uuid4
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from src.broker.broker import (
     BuyStockByAmountRequest,
@@ -16,7 +16,6 @@ from src.broker.broker_dtos import BrokerOperation
 from src.broker.broker_interface import Broker
 from src.config.config import settings
 from src.portfolio.errors import PortfolioError, PortfolioInitializationError
-from typing import Optional
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
 from src.portfolio.portfolio_register import portfolio_registry
 from src.stock.stock import Stock
@@ -226,7 +225,7 @@ class Portfolio:
             if not rollback_success:
                 self.set_stale_state()
                 raise PortfolioInitializationError(
-                        f"Initialization failed. Rollback also failed. Portfolio is in stale state.",
+                        "Initialization failed. Rollback also failed. Portfolio is in stale state.",
                         failed_operations=failed_operations,
                     )
 

@@ -3,7 +3,6 @@ import asyncio
 from decimal import Decimal
 import pytest
 import logging
-from src.broker.broker import BanChileBroker
 from src.broker.broker_dtos import (
     BuyStockByAmountRequest,
     BuyStockByQuantityRequest,
@@ -16,9 +15,8 @@ from src.broker.broker_dtos import (
 from src.broker.broker_interface import Broker
 from src.portfolio.portfolio import Portfolio
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
-from src.portfolio.errors import PortfolioError, PortfolioInitializationError
+from src.portfolio.errors import PortfolioError
 from src.stock.stock import Stock
-from src.utils.fake_market import NASDAQ
 from src.utils.decimal_utils import quantize_money, quantize_quantity
 
 
@@ -989,7 +987,6 @@ class TestRollbackMechanism:
             for symbol, stock in portfolio.allocated_stocks.items()
         }
         portfolio_value_info_before = portfolio.get_total_value()
-        portfolio_value_before = portfolio_value_info_before.total_value
         portfolio_retail_status_before = portfolio_value_info_before.is_retail
 
         # Dramatically change all stock prices to trigger rebalancing
@@ -1010,7 +1007,6 @@ class TestRollbackMechanism:
             for symbol, stock in portfolio.allocated_stocks.items()
         }
         portfolio_value_info_after = portfolio.get_total_value()
-        portfolio_value_after = portfolio_value_info_after.total_value
         portfolio_retail_status_after = portfolio_value_info_after.is_retail
 
         # Log any discrepancies in stock quantities

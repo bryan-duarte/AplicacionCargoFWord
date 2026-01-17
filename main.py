@@ -51,15 +51,15 @@ async def main():
 
     # Primer cambio de AAPL (sin rebalanceo)
     NASDAQ.get("AAPL").current_price(Decimal("180"))
-    logging.info(f"AAPL cambió a $180 (sin rebalanceo)")
+    logging.info("AAPL cambió a $180 (sin rebalanceo)")
 
     # Segundo cambio de AAPL (sin rebalanceo)
     NASDAQ.get("AAPL").current_price(Decimal("190"))
-    logging.info(f"AAPL cambió a $190 (sin rebalanceo)")
+    logging.info("AAPL cambió a $190 (sin rebalanceo)")
 
     # Tercer cambio de AAPL (sin rebalanceo)
     NASDAQ.get("AAPL").current_price(Decimal("200"))
-    logging.info(f"AAPL cambió a $200 (sin rebalanceo)")
+    logging.info("AAPL cambió a $200 (sin rebalanceo)")
 
     # AHORA sí rebalanceamos con el precio final
     logging.info("=== Ahora ejecutamos el rebalanceo con el precio final ===")
