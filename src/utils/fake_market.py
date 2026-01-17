@@ -1,5 +1,6 @@
-from src.stock.stock import Stock
 from decimal import Decimal
+
+from src.stock.stock import Stock
 
 
 class FakeMarket:

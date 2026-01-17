@@ -1,21 +1,24 @@
 """Integration tests for portfolio rebalancing functionality."""
+
 import asyncio
-from decimal import Decimal
-import pytest
 import logging
+from decimal import Decimal
+
+import pytest
+
 from src.broker.broker_dtos import (
+    BatchOperationEntry,
     BuyStockByAmountRequest,
     BuyStockByQuantityRequest,
-    SellStockByQuantityRequest,
     BuyStockResponse,
-    SellStockResponse,
-    BatchOperationEntry,
     OperationState,
+    SellStockByQuantityRequest,
+    SellStockResponse,
 )
 from src.broker.broker_interface import Broker
+from src.portfolio.errors import PortfolioError
 from src.portfolio.portfolio import Portfolio
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
-from src.portfolio.errors import PortfolioError
 from src.stock.stock import Stock
 from src.utils.decimal_utils import quantize_money, quantize_quantity
 
@@ -43,7 +46,9 @@ class DummyBroker(Broker):
         """Get the current market price for a stock symbol."""
         return self._market_prices.get(stock_symbol, Decimal("100.00"))
 
-    async def buy_stock_by_amount(self, request: BuyStockByAmountRequest) -> BuyStockResponse:
+    async def buy_stock_by_amount(
+        self, request: BuyStockByAmountRequest
+    ) -> BuyStockResponse:
         """Buy stock by amount with simulated network latency."""
         await self._simulate_network_latency()
 
@@ -62,7 +67,9 @@ class DummyBroker(Broker):
         self._register_batch_operation(request, buy_response)
         return buy_response
 
-    async def buy_stock_by_quantity(self, request: BuyStockByQuantityRequest) -> BuyStockResponse:
+    async def buy_stock_by_quantity(
+        self, request: BuyStockByQuantityRequest
+    ) -> BuyStockResponse:
         """Buy stock by quantity with optional failure simulation."""
         self._total_buy_operations += 1
 
@@ -89,7 +96,9 @@ class DummyBroker(Broker):
         """Sell stock by amount (not implemented)."""
         raise NotImplementedError()
 
-    async def sell_stock_by_quantity(self, request: SellStockByQuantityRequest) -> SellStockResponse:
+    async def sell_stock_by_quantity(
+        self, request: SellStockByQuantityRequest
+    ) -> SellStockResponse:
         """Sell stock by quantity with simulated network latency."""
         self._total_sell_operations += 1
 
@@ -116,7 +125,9 @@ class DummyBroker(Broker):
             self._failure_trigger_threshold is not None
             and self._total_buy_operations >= self._failure_trigger_threshold
         ):
-            raise Exception(f"Simulated failure on buy operation {self._total_buy_operations}")
+            raise Exception(
+                f"Simulated failure on buy operation {self._total_buy_operations}"
+            )
 
     async def _simulate_network_latency(self) -> None:
         """Simulate network delay if configured."""
@@ -125,7 +136,9 @@ class DummyBroker(Broker):
 
     def _register_batch_operation(
         self,
-        request: BuyStockByAmountRequest | BuyStockByQuantityRequest | SellStockByQuantityRequest,
+        request: BuyStockByAmountRequest
+        | BuyStockByQuantityRequest
+        | SellStockByQuantityRequest,
         response: BuyStockResponse | SellStockResponse,
     ) -> None:
         """Register an operation in the batch registry for potential rollback."""
@@ -205,17 +218,21 @@ class FailingRollbackBroker(DummyBroker):
         self._rollback_failure_enabled: bool = True
         self._executed_partial_operations: list[dict] = []
 
-    async def buy_stock_by_quantity(self, request: BuyStockByQuantityRequest) -> BuyStockResponse:
+    async def buy_stock_by_quantity(
+        self, request: BuyStockByQuantityRequest
+    ) -> BuyStockResponse:
         """Track partial operations before potential failure."""
         try:
             buy_result = await super().buy_stock_by_quantity(request)
 
-            self._executed_partial_operations.append({
-                "operation_type": "BUY",
-                "stock_symbol": buy_result.symbol,
-                "traded_quantity": buy_result.quantity,
-                "associated_batch_uuid": request.batch_uuid,
-            })
+            self._executed_partial_operations.append(
+                {
+                    "operation_type": "BUY",
+                    "stock_symbol": buy_result.symbol,
+                    "traded_quantity": buy_result.quantity,
+                    "associated_batch_uuid": request.batch_uuid,
+                }
+            )
 
             return buy_result
         except Exception:
@@ -242,7 +259,6 @@ class FailingRollbackBroker(DummyBroker):
 
 
 class TestSimplePortfolioRebalancing:
-
     @pytest.mark.asyncio
     async def test_simple_rebalancing_maintains_correct_distribution(
         self, sample_portfolio_config: PortfolioConfig, reset_registries
@@ -284,7 +300,9 @@ class TestSimplePortfolioRebalancing:
         tolerance_percentage = Decimal("0.001")
 
         for symbol, allocated_stock in portfolio.allocated_stocks.items():
-            current_allocation_percentage = allocated_stock.total_value / final_total_value
+            current_allocation_percentage = (
+                allocated_stock.total_value / final_total_value
+            )
             target_allocation_percentage = allocated_stock.allocation_percentage
             allocation_deviation = abs(
                 current_allocation_percentage - target_allocation_percentage
@@ -311,7 +329,9 @@ class TestSimplePortfolioRebalancing:
             "Expected at least one stock quantity to change after price changes and rebalance"
         )
 
-        assert portfolio.is_locked is False, "Lock should be released after rebalance completes"
+        assert portfolio.is_locked is False, (
+            "Lock should be released after rebalance completes"
+        )
 
     @pytest.mark.asyncio
     async def test_no_rebalancing_when_prices_stable(
@@ -352,7 +372,8 @@ class TestSimplePortfolioRebalancing:
                 )
 
         assert all(
-            portfolio.allocated_stocks[symbol].quantity == initial_stock_quantities[symbol]
+            portfolio.allocated_stocks[symbol].quantity
+            == initial_stock_quantities[symbol]
             for symbol in initial_stock_quantities
         ), "Quantities should not change when prices are stable"
 
@@ -360,7 +381,9 @@ class TestSimplePortfolioRebalancing:
         tolerance_percentage = Decimal("0.001")
 
         for symbol, allocated_stock in portfolio.allocated_stocks.items():
-            current_allocation_percentage = allocated_stock.total_value / final_total_value
+            current_allocation_percentage = (
+                allocated_stock.total_value / final_total_value
+            )
             target_allocation_percentage = allocated_stock.allocation_percentage
             allocation_deviation = abs(
                 current_allocation_percentage - target_allocation_percentage
@@ -380,7 +403,6 @@ class TestSimplePortfolioRebalancing:
 
 
 class TestHighVolumeRebalancing:
-
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_rebalancing_with_hundreds_of_random_price_changes(
@@ -408,7 +430,10 @@ class TestHighVolumeRebalancing:
             portfolio_name="HighVolumeTest",
             initial_investment=Decimal("50000.00"),
             stocks_to_allocate=[
-                StockToAllocate(stock=test_stocks[i], allocation_percentage=allocation_percentages[i])
+                StockToAllocate(
+                    stock=test_stocks[i],
+                    allocation_percentage=allocation_percentages[i],
+                )
                 for i in range(len(test_stocks))
             ],
             rebalance_lock_ttl_seconds=300,
@@ -445,9 +470,20 @@ class TestHighVolumeRebalancing:
         for change_iteration in range(NUMBER_OF_PRICE_CHANGES):
             selected_symbol = random.choice(stock_symbols)
 
-            current_stock_price = test_portfolio.allocated_stocks[selected_symbol].stock.price
-            price_variation_percent = Decimal(str(random.uniform(-float(MAX_PRICE_CHANGE_PERCENT), float(MAX_PRICE_CHANGE_PERCENT))))
-            updated_price = quantize_money(current_stock_price * (Decimal("1") + price_variation_percent))
+            current_stock_price = test_portfolio.allocated_stocks[
+                selected_symbol
+            ].stock.price
+            price_variation_percent = Decimal(
+                str(
+                    random.uniform(
+                        -float(MAX_PRICE_CHANGE_PERCENT),
+                        float(MAX_PRICE_CHANGE_PERCENT),
+                    )
+                )
+            )
+            updated_price = quantize_money(
+                current_stock_price * (Decimal("1") + price_variation_percent)
+            )
             clamped_price = max(MIN_PRICE, min(updated_price, MAX_PRICE))
 
             test_portfolio.update_allocated_stock_price(selected_symbol, clamped_price)
@@ -457,7 +493,9 @@ class TestHighVolumeRebalancing:
                 current_total_value = test_portfolio.get_total_value().total_value
 
                 for symbol, allocated_stock in test_portfolio.allocated_stocks.items():
-                    actual_allocation = allocated_stock.total_value / current_total_value
+                    actual_allocation = (
+                        allocated_stock.total_value / current_total_value
+                    )
                     target_allocation = allocated_stock.allocation_percentage
                     allocation_deviation = abs(actual_allocation - target_allocation)
 
@@ -494,9 +532,7 @@ class TestHighVolumeRebalancing:
         )
 
     @pytest.mark.asyncio
-    async def test_rebalancing_with_extreme_price_levels(
-        self, reset_registries
-    ):
+    async def test_rebalancing_with_extreme_price_levels(self, reset_registries):
         volatile_stocks = [
             Stock(symbol="VOLA", price=Decimal("100.00")),
             Stock(symbol="VOLB", price=Decimal("100.00")),
@@ -507,9 +543,15 @@ class TestHighVolumeRebalancing:
             portfolio_name="ExtremePriceLevelsTest",
             initial_investment=Decimal("30000.00"),
             stocks_to_allocate=[
-                StockToAllocate(stock=volatile_stocks[0], allocation_percentage=Decimal("0.3333")),
-                StockToAllocate(stock=volatile_stocks[1], allocation_percentage=Decimal("0.3333")),
-                StockToAllocate(stock=volatile_stocks[2], allocation_percentage=Decimal("0.3334")),
+                StockToAllocate(
+                    stock=volatile_stocks[0], allocation_percentage=Decimal("0.3333")
+                ),
+                StockToAllocate(
+                    stock=volatile_stocks[1], allocation_percentage=Decimal("0.3333")
+                ),
+                StockToAllocate(
+                    stock=volatile_stocks[2], allocation_percentage=Decimal("0.3334")
+                ),
             ],
             rebalance_lock_ttl_seconds=300,
         )
@@ -519,7 +561,9 @@ class TestHighVolumeRebalancing:
             "VOLB": Decimal("100.00"),
             "VOLC": Decimal("100.00"),
         }
-        volatility_test_broker = DummyBroker(market=base_market_prices, latency_seconds=0.01)
+        volatility_test_broker = DummyBroker(
+            market=base_market_prices, latency_seconds=0.01
+        )
 
         volatility_test_portfolio = Portfolio(
             config=equal_allocation_config,
@@ -532,20 +576,39 @@ class TestHighVolumeRebalancing:
         ALLOCATION_TOLERANCE = Decimal("0.001")
 
         price_volatility_scenarios = [
-            {"VOLA": Decimal("100.00"), "VOLB": Decimal("500.00"), "VOLC": Decimal("250.00")},
-            {"VOLA": Decimal("400.00"), "VOLB": Decimal("150.00"), "VOLC": Decimal("200.00")},
-            {"VOLA": Decimal("300.00"), "VOLB": Decimal("350.00"), "VOLC": Decimal("180.00")},
+            {
+                "VOLA": Decimal("100.00"),
+                "VOLB": Decimal("500.00"),
+                "VOLC": Decimal("250.00"),
+            },
+            {
+                "VOLA": Decimal("400.00"),
+                "VOLB": Decimal("150.00"),
+                "VOLC": Decimal("200.00"),
+            },
+            {
+                "VOLA": Decimal("300.00"),
+                "VOLB": Decimal("350.00"),
+                "VOLC": Decimal("180.00"),
+            },
         ]
 
         for scenario_index, scenario_prices in enumerate(price_volatility_scenarios):
             for symbol, new_price in scenario_prices.items():
-                volatility_test_portfolio.update_allocated_stock_price(symbol, new_price)
+                volatility_test_portfolio.update_allocated_stock_price(
+                    symbol, new_price
+                )
 
             await volatility_test_portfolio.rebalance()
 
-            scenario_total_value = volatility_test_portfolio.get_total_value().total_value
+            scenario_total_value = (
+                volatility_test_portfolio.get_total_value().total_value
+            )
 
-            for symbol, allocated_stock in volatility_test_portfolio.allocated_stocks.items():
+            for (
+                symbol,
+                allocated_stock,
+            ) in volatility_test_portfolio.allocated_stocks.items():
                 actual_allocation = allocated_stock.total_value / scenario_total_value
                 target_allocation = allocated_stock.allocation_percentage
                 allocation_deviation = abs(actual_allocation - target_allocation)
@@ -560,12 +623,18 @@ class TestHighVolumeRebalancing:
                     f"Stock {symbol} has invalid quantity in scenario {scenario_index + 1}"
                 )
 
-        assert volatility_test_portfolio.is_locked is False, "Lock should be released after all extreme price rebalances"
-        assert volatility_test_broker.buy_operation_count > 0, "Expected buy operations during extreme price rebalancing"
-        assert volatility_test_broker.sell_operation_count > 0, "Expected sell operations during extreme price rebalancing"
+        assert volatility_test_portfolio.is_locked is False, (
+            "Lock should be released after all extreme price rebalances"
+        )
+        assert volatility_test_broker.buy_operation_count > 0, (
+            "Expected buy operations during extreme price rebalancing"
+        )
+        assert volatility_test_broker.sell_operation_count > 0, (
+            "Expected sell operations during extreme price rebalancing"
+        )
+
 
 class TestRebalanceLockMechanism:
-
     @pytest.mark.asyncio
     async def test_concurrent_rebalances_are_prevented_by_lock(
         self, sample_portfolio_config: PortfolioConfig, reset_registries
@@ -654,22 +723,38 @@ class TestRebalanceLockMechanism:
 
         await portfolio.initialize()
 
-        aapl_quantity_before_first_rebalance = portfolio.allocated_stocks["AAPL"].quantity
-        msft_quantity_before_second_rebalance = portfolio.allocated_stocks["MSFT"].quantity
+        aapl_quantity_before_first_rebalance = portfolio.allocated_stocks[
+            "AAPL"
+        ].quantity
+        msft_quantity_before_second_rebalance = portfolio.allocated_stocks[
+            "MSFT"
+        ].quantity
 
         portfolio.update_allocated_stock_price("AAPL", Decimal("200.00"))
-        assert portfolio.is_locked is False, "Lock should not be held before first rebalance"
+        assert portfolio.is_locked is False, (
+            "Lock should not be held before first rebalance"
+        )
 
         await portfolio.rebalance()
-        assert portfolio.is_locked is False, "Lock should be released after successful rebalance"
-        assert portfolio.lock_age_seconds is None, "Lock timestamp should be cleared after successful rebalance"
+        assert portfolio.is_locked is False, (
+            "Lock should be released after successful rebalance"
+        )
+        assert portfolio.lock_age_seconds is None, (
+            "Lock timestamp should be cleared after successful rebalance"
+        )
 
         portfolio.update_allocated_stock_price("MSFT", Decimal("400.00"))
-        assert portfolio.is_locked is False, "Lock should not be held between rebalances"
+        assert portfolio.is_locked is False, (
+            "Lock should not be held between rebalances"
+        )
 
         await portfolio.rebalance()
-        assert portfolio.is_locked is False, "Lock should be released after second successful rebalance"
-        assert portfolio.lock_age_seconds is None, "Lock timestamp should be cleared after second successful rebalance"
+        assert portfolio.is_locked is False, (
+            "Lock should be released after second successful rebalance"
+        )
+        assert portfolio.lock_age_seconds is None, (
+            "Lock timestamp should be cleared after second successful rebalance"
+        )
 
         aapl_quantity_after_rebalance = portfolio.allocated_stocks["AAPL"].quantity
         msft_quantity_after_rebalance = portfolio.allocated_stocks["MSFT"].quantity
@@ -694,7 +779,9 @@ class TestRebalanceLockMechanism:
             "TSLA": Decimal("800.00"),
             "AMZN": Decimal("3200.00"),
         }
-        broker = DummyBroker(market=market_prices, fail_on_nth_buy=1, latency_seconds=0.05)
+        broker = DummyBroker(
+            market=market_prices, fail_on_nth_buy=1, latency_seconds=0.05
+        )
 
         portfolio = Portfolio(
             config=sample_portfolio_config,
@@ -725,15 +812,23 @@ class TestRebalanceLockMechanism:
         with pytest.raises(PortfolioError):
             await portfolio.rebalance()
 
-        assert lock_was_acquired, "Lock should have been acquired before rebalance failed"
-        assert portfolio.is_locked is False, "Lock should be released after failed rebalance"
-        assert portfolio.lock_age_seconds is None, "Lock timestamp should be cleared after failed rebalance"
+        assert lock_was_acquired, (
+            "Lock should have been acquired before rebalance failed"
+        )
+        assert portfolio.is_locked is False, (
+            "Lock should be released after failed rebalance"
+        )
+        assert portfolio.lock_age_seconds is None, (
+            "Lock timestamp should be cleared after failed rebalance"
+        )
 
         broker.reset_counters()
         broker._failure_trigger_threshold = None
 
         await portfolio.rebalance()
-        assert portfolio.is_locked is False, "Lock should be released after recovery rebalance"
+        assert portfolio.is_locked is False, (
+            "Lock should be released after recovery rebalance"
+        )
 
         for symbol, allocated_stock in portfolio.allocated_stocks.items():
             stock_quantity = allocated_stock.quantity
@@ -775,9 +870,9 @@ class TestRebalanceLockMechanism:
         portfolio._rebalance_start_time = datetime.now() - timedelta(seconds=2)
 
         lock_age = portfolio.lock_age_seconds
-        assert lock_age is not None and lock_age > portfolio._rebalance_lock_ttl_seconds, (
-            "Test setup error: lock should be expired"
-        )
+        assert (
+            lock_age is not None and lock_age > portfolio._rebalance_lock_ttl_seconds
+        ), "Test setup error: lock should be expired"
 
         portfolio.update_allocated_stock_price("AAPL", Decimal("999.00"))
         await portfolio.rebalance()
@@ -815,11 +910,8 @@ class TestRebalanceLockMechanism:
 
 
 class TestRollbackMechanism:
-
     @pytest.mark.asyncio
-    async def test_rollback_on_partial_rebalance_failure(
-        self, reset_registries
-    ):
+    async def test_rollback_on_partial_rebalance_failure(self, reset_registries):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -854,9 +946,7 @@ class TestRollbackMechanism:
 
         # Create broker that will fail on the 3rd buy operation
         broker_with_failure = DummyBroker(
-            market=initial_market_prices,
-            fail_on_nth_buy=3,
-            latency_seconds=0.01
+            market=initial_market_prices, fail_on_nth_buy=3, latency_seconds=0.01
         )
 
         # Create portfolio instance
@@ -900,7 +990,7 @@ class TestRollbackMechanism:
         }
 
         # Verify all stock quantities were restored to original values
-        for symbol in stock_quantities_before_rebalance.keys():
+        for symbol in stock_quantities_before_rebalance:
             quantity_before = stock_quantities_before_rebalance[symbol]
             quantity_after = stock_quantities_after_rollback[symbol]
 
@@ -911,8 +1001,12 @@ class TestRollbackMechanism:
             )
 
         # Verify compensating sell operations were executed
-        buys_executed = broker_with_failure.buy_operation_count - broker_buy_count_before
-        sells_executed = broker_with_failure.sell_operation_count - broker_sell_count_before
+        buys_executed = (
+            broker_with_failure.buy_operation_count - broker_buy_count_before
+        )
+        sells_executed = (
+            broker_with_failure.sell_operation_count - broker_sell_count_before
+        )
 
         logging.info(f"Rollback: {buys_executed} buys, {sells_executed} sells")
 
@@ -930,9 +1024,7 @@ class TestRollbackMechanism:
         )
 
     @pytest.mark.asyncio
-    async def test_portfolio_state_consistent_after_rollback(
-        self, reset_registries
-    ):
+    async def test_portfolio_state_consistent_after_rollback(self, reset_registries):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -967,9 +1059,7 @@ class TestRollbackMechanism:
 
         # Create broker that will fail on the 3rd buy operation
         broker_with_failure = DummyBroker(
-            market=initial_market_prices,
-            fail_on_nth_buy=3,
-            latency_seconds=0.01
+            market=initial_market_prices, fail_on_nth_buy=3, latency_seconds=0.01
         )
 
         # Create portfolio instance
@@ -1010,7 +1100,7 @@ class TestRollbackMechanism:
         portfolio_retail_status_after = portfolio_value_info_after.is_retail
 
         # Log any discrepancies in stock quantities
-        for symbol in stock_quantities_before_rebalance.keys():
+        for symbol in stock_quantities_before_rebalance:
             quantity_before = stock_quantities_before_rebalance[symbol]
             quantity_after = stock_quantities_after_rollback[symbol]
 
@@ -1023,7 +1113,8 @@ class TestRollbackMechanism:
 
         # Verify all stock quantities were exactly restored
         assert all(
-            stock_quantities_after_rollback[symbol] == stock_quantities_before_rebalance[symbol]
+            stock_quantities_after_rollback[symbol]
+            == stock_quantities_before_rebalance[symbol]
             for symbol in stock_quantities_before_rebalance
         ), "All quantities must be exactly restored after rollback"
 
@@ -1045,9 +1136,7 @@ class TestRollbackMechanism:
         )
 
     @pytest.mark.asyncio
-    async def test_stale_state_when_rollback_fails(
-        self, reset_registries
-    ):
+    async def test_stale_state_when_rollback_fails(self, reset_registries):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -1082,9 +1171,7 @@ class TestRollbackMechanism:
 
         # Create broker that fails both buy operations and rollback
         broker_with_failing_rollback = FailingRollbackBroker(
-            market=initial_market_prices,
-            fail_on_nth_buy=3,
-            latency_seconds=0.01
+            market=initial_market_prices, fail_on_nth_buy=3, latency_seconds=0.01
         )
 
         # Create portfolio instance
@@ -1132,7 +1219,8 @@ class TestRollbackMechanism:
 
         # Verify quantities remain unchanged after failed rebalance
         assert all(
-            stock_quantities_after_failed_rollback[symbol] == stock_quantities_before_rebalance[symbol]
+            stock_quantities_after_failed_rollback[symbol]
+            == stock_quantities_before_rebalance[symbol]
             for symbol in stock_quantities_before_rebalance
         ), "Quantities should be unchanged after failed rebalance"
 

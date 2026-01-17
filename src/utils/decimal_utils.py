@@ -1,10 +1,14 @@
 """Decimal utility functions for quantizing values to specific precisions."""
-from decimal import Decimal, ROUND_HALF_UP
+
+from decimal import ROUND_HALF_UP, Decimal
+
 from src.config.config import settings
 
 _QUANTIZER_MONEY = Decimal(f"0.{'0' * settings.shared.money_decimal_precision}")
 _QUANTIZER_QUANTITY = Decimal(f"0.{'0' * settings.shared.quantity_decimal_precision}")
-_QUANTIZER_PERCENTAGE = Decimal(f"0.{'0' * settings.shared.percentage_decimal_precision}")
+_QUANTIZER_PERCENTAGE = Decimal(
+    f"0.{'0' * settings.shared.percentage_decimal_precision}"
+)
 
 
 def quantize_money(value: Decimal) -> Decimal:

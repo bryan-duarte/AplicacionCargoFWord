@@ -1,6 +1,9 @@
 """Data Transfer Objects (DTOs) for Portfolio configuration and instantiation."""
+
 from decimal import Decimal
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from src.config.config import settings
 from src.stock.stock import Stock
 
@@ -25,16 +28,13 @@ class StockToAllocate(BaseModel):
 
 
 class PortfolioConfig(BaseModel):
-
     model_config = ConfigDict(
         frozen=True,
         arbitrary_types_allowed=True,
     )
 
     portfolio_name: str = Field(
-        ...,
-        min_length=1,
-        description="Identifying name of this portfolio"
+        ..., min_length=1, description="Identifying name of this portfolio"
     )
 
     initial_investment: Decimal = Field(
@@ -59,10 +59,11 @@ class PortfolioConfig(BaseModel):
         description="TTL for rebalance lock in seconds (default: 21600 = 6 hours)",
     )
 
-    @field_validator('stocks_to_allocate')
+    @field_validator("stocks_to_allocate")
     @classmethod
-    def validate_unique_stock_symbols(cls, allocations: list[StockToAllocate]) -> list[StockToAllocate]:
-
+    def validate_unique_stock_symbols(
+        cls, allocations: list[StockToAllocate]
+    ) -> list[StockToAllocate]:
         stock_symbols = [allocation.stock.symbol for allocation in allocations]
         unique_stock_symbols = set(stock_symbols)
 
@@ -75,9 +76,8 @@ class PortfolioConfig(BaseModel):
 
         return allocations
 
-    @model_validator(mode='after')
-    def validate_allocation_percentages_sum_to_100_percent(self) -> 'PortfolioConfig':
-
+    @model_validator(mode="after")
+    def validate_allocation_percentages_sum_to_100_percent(self) -> "PortfolioConfig":
         expected_allocation_sum = settings.shared.percentage_expected_sum
         allowed_tolerance = settings.shared.percentage_tolerance
 
@@ -85,7 +85,9 @@ class PortfolioConfig(BaseModel):
         for allocation in self.stocks_to_allocate:
             actual_allocation_sum += allocation.allocation_percentage
 
-        allocation_difference_from_100_percent = abs(actual_allocation_sum - expected_allocation_sum)
+        allocation_difference_from_100_percent = abs(
+            actual_allocation_sum - expected_allocation_sum
+        )
         exceeds_tolerance = allocation_difference_from_100_percent >= allowed_tolerance
 
         if exceeds_tolerance:

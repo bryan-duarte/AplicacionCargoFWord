@@ -1,8 +1,9 @@
-from src.config.config import settings
-from src.stock.errors import InvalidSymbolError, InvalidPriceError
-from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
 import re
+from decimal import Decimal
+from typing import TYPE_CHECKING, Optional
+
+from src.config.config import settings
+from src.stock.errors import InvalidPriceError, InvalidSymbolError
 
 if TYPE_CHECKING:
     from src.utils.fake_market import FakeMarket
@@ -15,8 +16,8 @@ class Stock:
         price: Decimal,
         *,
         market: Optional["FakeMarket"] = None,
-        min_price: Optional[Decimal] = None,
-        max_price: Optional[Decimal] = None,
+        min_price: Decimal | None = None,
+        max_price: Decimal | None = None,
     ):
         """Initialize a Stock with symbol and price.
 
@@ -29,14 +30,18 @@ class Stock:
         """
         self._symbol = self._validate_symbol(symbol)
         self._min_price = min_price if min_price is not None else Decimal("0.01")
-        self._max_price = max_price if max_price is not None else settings.stock.max_price
+        self._max_price = (
+            max_price if max_price is not None else settings.stock.max_price
+        )
         self._price = self._validate_price(price)
         self._market = market
 
     def _validate_symbol(self, symbol: str) -> str:
         """Validate that symbol is exactly 4 uppercase letters."""
         if not isinstance(symbol, str):
-            raise InvalidSymbolError(f"Symbol must be a string, got {type(symbol).__name__}")
+            raise InvalidSymbolError(
+                f"Symbol must be a string, got {type(symbol).__name__}"
+            )
 
         normalized = symbol.strip().upper()
 

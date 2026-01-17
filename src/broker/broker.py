@@ -1,39 +1,39 @@
-from src.broker.broker_dtos import (
-    BuyStockByAmountRequest,
-    BuyStockByQuantityRequest,
-    SellStockByAmountRequest,
-    SellStockByQuantityRequest,
-    BuyStockResponse,
-    SellStockResponse,
-    BatchOperationEntry,
-    OperationState,
-)
-from src.broker.broker_interface import Broker
-from src.broker.errors import (
-    StockNotFoundError,
-    BuyStockError,
-    SellStockError,
-    BrokerConnectionError,
-)
-from src.utils.fake_market import NASDAQ
-from src.utils.decimal_utils import quantize_quantity, quantize_money
-from typing import Optional, Union
-from uuid import UUID
-from decimal import Decimal
 import asyncio
 import logging
 import random
+from decimal import Decimal
+from uuid import UUID
+
+from src.broker.broker_dtos import (
+    BatchOperationEntry,
+    BuyStockByAmountRequest,
+    BuyStockByQuantityRequest,
+    BuyStockResponse,
+    OperationState,
+    SellStockByAmountRequest,
+    SellStockByQuantityRequest,
+    SellStockResponse,
+)
+from src.broker.broker_interface import Broker
+from src.broker.errors import (
+    BrokerConnectionError,
+    BuyStockError,
+    SellStockError,
+    StockNotFoundError,
+)
+from src.utils.decimal_utils import quantize_money, quantize_quantity
+from src.utils.fake_market import NASDAQ
 
 
 class BanChileBroker(Broker):
     def __init__(
         self,
         *,
-        min_money: Optional[Decimal] = None,
-        max_money: Optional[Decimal] = None,
-        min_quantity_buy: Optional[Decimal] = None,
-        min_quantity_sell: Optional[Decimal] = None,
-        max_quantity: Optional[Decimal] = None,
+        min_money: Decimal | None = None,
+        max_money: Decimal | None = None,
+        min_quantity_buy: Decimal | None = None,
+        min_quantity_sell: Decimal | None = None,
+        max_quantity: Decimal | None = None,
         min_delay_seconds: int = 1,
         max_delay_seconds: int = 2,
         batch_retry_delay_seconds: int = 1,
@@ -60,9 +60,15 @@ class BanChileBroker(Broker):
         self._min_money = min_money if min_money is not None else Decimal("0.01")
         self._max_money = max_money if max_money is not None else Decimal("10000000.00")
 
-        self._min_quantity_buy = min_quantity_buy if min_quantity_buy is not None else Decimal("0.01")
-        self._min_quantity_sell = min_quantity_sell if min_quantity_sell is not None else Decimal("0.000001")
-        self._max_quantity = max_quantity if max_quantity is not None else Decimal("1000000.000000000")
+        self._min_quantity_buy = (
+            min_quantity_buy if min_quantity_buy is not None else Decimal("0.01")
+        )
+        self._min_quantity_sell = (
+            min_quantity_sell if min_quantity_sell is not None else Decimal("0.000001")
+        )
+        self._max_quantity = (
+            max_quantity if max_quantity is not None else Decimal("1000000.000000000")
+        )
 
         self._min_delay_seconds = min_delay_seconds
         self._max_delay_seconds = max_delay_seconds
@@ -92,12 +98,10 @@ class BanChileBroker(Broker):
 
     def _register_operation(
         self,
-        operation: Union[
-            BuyStockByAmountRequest,
-            BuyStockByQuantityRequest,
-            SellStockByAmountRequest,
-            SellStockByQuantityRequest,
-        ],
+        operation: BuyStockByAmountRequest
+        | BuyStockByQuantityRequest
+        | SellStockByAmountRequest
+        | SellStockByQuantityRequest,
     ) -> None:
         """Register an operation in the batch registry."""
         if operation.batch_uuid is None:
@@ -106,21 +110,25 @@ class BanChileBroker(Broker):
         if operation.batch_uuid not in self._batch_registry:
             self._batch_registry[operation.batch_uuid] = {}
 
-        self._batch_registry[operation.batch_uuid][operation.uuid] = BatchOperationEntry(
-            operation_uuid=operation.uuid,
-            operation_schema=operation,
-            state=OperationState.PENDING,
+        self._batch_registry[operation.batch_uuid][operation.uuid] = (
+            BatchOperationEntry(
+                operation_uuid=operation.uuid,
+                operation_schema=operation,
+                state=OperationState.PENDING,
+            )
         )
 
     def _mark_operation_success(
         self,
         operation_uuid: UUID,
-        batch_uuid: Optional[UUID],
-        response: Union[BuyStockResponse, SellStockResponse],
+        batch_uuid: UUID | None,
+        response: BuyStockResponse | SellStockResponse,
     ) -> None:
         """Mark an operation as successful."""
-        
-        not_batch_operation = batch_uuid is None or batch_uuid not in self._batch_registry
+
+        not_batch_operation = (
+            batch_uuid is None or batch_uuid not in self._batch_registry
+        )
         if not_batch_operation:
             return
         if operation_uuid in self._batch_registry[batch_uuid]:
@@ -131,14 +139,18 @@ class BanChileBroker(Broker):
     def _mark_operation_error(
         self,
         operation_uuid: UUID,
-        batch_uuid: Optional[UUID],
+        batch_uuid: UUID | None,
     ) -> None:
         """Mark an operation as failed."""
-        not_batch_operation = batch_uuid is None or batch_uuid not in self._batch_registry
+        not_batch_operation = (
+            batch_uuid is None or batch_uuid not in self._batch_registry
+        )
         if not_batch_operation:
             return
         if operation_uuid in self._batch_registry[batch_uuid]:
-            self._batch_registry[batch_uuid][operation_uuid].state = OperationState.ERROR
+            self._batch_registry[batch_uuid][
+                operation_uuid
+            ].state = OperationState.ERROR
 
     async def buy_stock_by_amount(
         self, request_data: BuyStockByAmountRequest
@@ -166,7 +178,9 @@ class BanChileBroker(Broker):
                 symbol=request_data.symbol,
                 amount=request_data.amount,
                 price=stock_current_info.price,
-                quantity=quantize_quantity(request_data.amount / stock_current_info.price),
+                quantity=quantize_quantity(
+                    request_data.amount / stock_current_info.price
+                ),
                 batch_uuid=batch_uuid,
                 rollback=request_data.rollback,
             )
@@ -246,7 +260,9 @@ class BanChileBroker(Broker):
                 symbol=request_data.symbol,
                 amount=request_data.amount,
                 price=stock_current_info.price,
-                quantity=quantize_quantity(request_data.amount / stock_current_info.price),
+                quantity=quantize_quantity(
+                    request_data.amount / stock_current_info.price
+                ),
                 batch_uuid=BATCH_UUID,
                 rollback=request_data.rollback,
             )
@@ -305,8 +321,10 @@ class BanChileBroker(Broker):
             logging.warning(f"Batch {batch_uuid} not found in registry")
             return False
 
-        batch_entries : dict[UUID, BatchOperationEntry] = self._batch_registry[batch_uuid]
-        successful_operations : list[BatchOperationEntry] = [
+        batch_entries: dict[UUID, BatchOperationEntry] = self._batch_registry[
+            batch_uuid
+        ]
+        successful_operations: list[BatchOperationEntry] = [
             entry
             for entry in batch_entries.values()
             if entry.state == OperationState.SUCCESS

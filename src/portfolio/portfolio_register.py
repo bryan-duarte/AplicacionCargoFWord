@@ -1,6 +1,6 @@
 import asyncio
-import weakref
 import logging
+import weakref
 
 
 class PortfolioRegistry:

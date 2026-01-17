@@ -1,10 +1,13 @@
 """Broker operation DTOs."""
+
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional, Union
+from typing import Union
 from uuid import UUID, uuid4
+
 from pydantic import BaseModel, Field
+
 from src.config.config import settings
 
 # Default broker limits (can be overridden when creating DTOs)
@@ -19,19 +22,24 @@ class OperationType(Enum):
     BUY = "BUY"
     SELL = "SELL"
 
+
 class OperationStatus(Enum):
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
 
+
 class OperationState(Enum):
     """States for batch operation tracking."""
+
     PENDING = "PENDING"
     SUCCESS = "SUCCESS"
     ERROR = "ERROR"
     ROLLED_BACK = "ROLLED_BACK"
 
+
 class BatchOperationEntry(BaseModel):
     """Entry in broker's internal batch registry."""
+
     operation_uuid: UUID
     operation_schema: Union[
         "BuyStockByAmountRequest",
@@ -40,8 +48,9 @@ class BatchOperationEntry(BaseModel):
         "SellStockByQuantityRequest",
     ]
     state: OperationState
-    response: Optional[Union["BuyStockResponse", "SellStockResponse"]] = None
+    response: Union["BuyStockResponse", "SellStockResponse"] | None = None
     rollback_attempt: int = 0
+
 
 class BrokerOperation(BaseModel):
     date: datetime = datetime.now()
@@ -51,7 +60,7 @@ class BrokerOperation(BaseModel):
         max_length=settings.stock.symbol_max_length,
         description="Symbol of the stock",
     )
-    batch_uuid: Optional[UUID] = Field(
+    batch_uuid: UUID | None = Field(
         default=None,
         description="Batch UUID for grouping atomic operations",
     )
@@ -160,6 +169,7 @@ class SellStockByAmountRequest(BrokerOperation):
     def __repr__(self) -> str:
         return f"SellStockRequest(symbol={self.symbol}, amount={self.amount})"
 
+
 class SellStockByQuantityRequest(BrokerOperation):
     uuid: UUID = Field(
         default_factory=uuid4, description="Unique identifier for the operation"
@@ -177,6 +187,7 @@ class SellStockByQuantityRequest(BrokerOperation):
 
     def __repr__(self) -> str:
         return f"SellStockRequest(symbol={self.symbol}, quantity={self.quantity})"
+
 
 class SellStockResponse(BrokerOperation):
     uuid: UUID

@@ -1,15 +1,17 @@
-from decimal import Decimal
-from typing import Awaitable, Union, Optional
-from uuid import uuid4
-import logging
 import asyncio
+import logging
+from collections.abc import Awaitable
 from datetime import datetime
+from decimal import Decimal
+from uuid import uuid4
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from src.broker.broker import (
     BuyStockByAmountRequest,
     BuyStockByQuantityRequest,
-    SellStockByQuantityRequest,
     BuyStockResponse,
+    SellStockByQuantityRequest,
     SellStockResponse,
 )
 from src.broker.broker_dtos import BrokerOperation
@@ -30,12 +32,9 @@ class PortfolioValue(BaseModel):
         gt=0,
         max_digits=settings.shared.money_max_digits,
         decimal_places=settings.shared.money_decimal_precision,
-        description="Total value of the portfolio USD"
+        description="Total value of the portfolio USD",
     )
-    is_retail: bool = Field(
-        ...,
-        description="Is the portfolio a retail portfolio?"
-    )
+    is_retail: bool = Field(..., description="Is the portfolio a retail portfolio?")
 
 
 class AllocatedStock(BaseModel):
@@ -71,8 +70,8 @@ class Portfolio:
         config: PortfolioConfig,
         broker: Broker,
         *,
-        retail_threshold_usd: Optional[int] = None,
-        rebalance_threshold: Optional[Decimal] = None,
+        retail_threshold_usd: int | None = None,
+        rebalance_threshold: Decimal | None = None,
     ):
         """Initialize a Portfolio with configuration and broker.
 
@@ -89,12 +88,16 @@ class Portfolio:
         self._broker = broker
         self._stale: bool = False
 
-        self._retail_threshold_usd = retail_threshold_usd if retail_threshold_usd is not None else 25000
-        self._rebalance_threshold = rebalance_threshold if rebalance_threshold is not None else Decimal("0.00")
+        self._retail_threshold_usd = (
+            retail_threshold_usd if retail_threshold_usd is not None else 25000
+        )
+        self._rebalance_threshold = (
+            rebalance_threshold if rebalance_threshold is not None else Decimal("0.00")
+        )
 
         # Rebalance lock attributes
         self._is_rebalancing: bool = False
-        self._rebalance_start_time: Optional[datetime] = None
+        self._rebalance_start_time: datetime | None = None
         self._rebalance_lock_ttl_seconds: int = config.rebalance_lock_ttl_seconds
 
         self._set_stock_to_allocate(config.stocks_to_allocate)
@@ -119,7 +122,7 @@ class Portfolio:
         return self._stale
 
     @property
-    def lock_age_seconds(self) -> Optional[float]:
+    def lock_age_seconds(self) -> float | None:
         """Get the age of the current lock in seconds, or None if not locked."""
         if self._rebalance_start_time is None:
             return None
@@ -149,7 +152,7 @@ class Portfolio:
                 f"Portfolio '{self._portfolio_name}' is in stale state. "
                 "Manual recovery required. Call clear_stale_state() after verification."
             )
-    
+
     def set_stale_state(self) -> None:
         """Manually set the stale state."""
         self._stale = True
@@ -208,7 +211,7 @@ class Portfolio:
             )
             tasks_by_symbol[request.symbol] = self._buy_stock_by_amount(request)
 
-        results_list: list[Union[BrokerOperation, Exception]] = await asyncio.gather(
+        results_list: list[BrokerOperation | Exception] = await asyncio.gather(
             *tasks_by_symbol.values(), return_exceptions=True
         )
 
@@ -225,12 +228,13 @@ class Portfolio:
             if not rollback_success:
                 self.set_stale_state()
                 raise PortfolioInitializationError(
-                        "Initialization failed. Rollback also failed. Portfolio is in stale state.",
-                        failed_operations=failed_operations,
-                    )
+                    "Initialization failed. Rollback also failed. Portfolio is in stale state.",
+                    failed_operations=failed_operations,
+                )
 
             raise PortfolioInitializationError(
-                f"All {len(failed_operations)} operations failed: " + "; ".join(failed_operations),
+                f"All {len(failed_operations)} operations failed: "
+                + "; ".join(failed_operations),
                 failed_operations=failed_operations,
             )
 
@@ -242,7 +246,7 @@ class Portfolio:
         batch_uuid,
     ) -> tuple[list[Awaitable[BuyStockResponse]], list[Awaitable[SellStockResponse]]]:
         """Get balance operations with batch UUID included."""
-        
+
         broker = self._broker
         portfolio_total_value = self.get_total_value().total_value
 
@@ -302,19 +306,29 @@ class Portfolio:
 
         try:
             batch_uuid = uuid4()
-            buy_operations_list, sell_operations_list = self._get_balance_operations_batch(batch_uuid)
+            buy_operations_list, sell_operations_list = (
+                self._get_balance_operations_batch(batch_uuid)
+            )
 
-            buy_results: list[Union[BuyStockResponse, Exception]] = []
-            sell_results: list[Union[SellStockResponse, Exception]] = []
+            buy_results: list[BuyStockResponse | Exception] = []
+            sell_results: list[SellStockResponse | Exception] = []
 
             if buy_operations_list:
-                buy_results = await asyncio.gather(*buy_operations_list, return_exceptions=True)
+                buy_results = await asyncio.gather(
+                    *buy_operations_list, return_exceptions=True
+                )
 
             if sell_operations_list:
-                sell_results = await asyncio.gather(*sell_operations_list, return_exceptions=True)
+                sell_results = await asyncio.gather(
+                    *sell_operations_list, return_exceptions=True
+                )
 
-            buy_failures = [failure for failure in buy_results if isinstance(failure, Exception)]
-            sell_failures = [failure for failure in sell_results if isinstance(failure, Exception)]
+            buy_failures = [
+                failure for failure in buy_results if isinstance(failure, Exception)
+            ]
+            sell_failures = [
+                failure for failure in sell_results if isinstance(failure, Exception)
+            ]
             failures = buy_failures + sell_failures
 
             if failures:
@@ -328,19 +342,29 @@ class Portfolio:
 
                     if not rollback_success:
                         self.set_stale_state()
-                        raise PortfolioError("Rebalancing failed. Rollback also failed. Stale state.")
+                        raise PortfolioError(
+                            "Rebalancing failed. Rollback also failed. Stale state."
+                        )
 
-                    raise PortfolioError("Rebalancing failed. Rolled back partial executions in broker.")
+                    raise PortfolioError(
+                        "Rebalancing failed. Rolled back partial executions in broker."
+                    )
 
-                raise PortfolioError(f"Rebalancing failed: {'; '.join(str(e) for e in failures)}")
+                raise PortfolioError(
+                    f"Rebalancing failed: {'; '.join(str(e) for e in failures)}"
+                )
 
             for response in buy_results:
                 if isinstance(response, BuyStockResponse):
-                    self._allocated_stocks[response.symbol].quantity += response.quantity
+                    self._allocated_stocks[
+                        response.symbol
+                    ].quantity += response.quantity
 
             for response in sell_results:
                 if isinstance(response, SellStockResponse):
-                    self._allocated_stocks[response.symbol].quantity -= response.quantity
+                    self._allocated_stocks[
+                        response.symbol
+                    ].quantity -= response.quantity
 
         finally:
             self._is_rebalancing = False
@@ -378,7 +402,9 @@ class Portfolio:
         response = await self._broker.buy_stock_by_amount(buy_stock_by_amount_request)
         self._allocated_stocks[response.symbol] = AllocatedStock(
             stock=Stock(symbol=response.symbol, price=response.price),
-            allocation_percentage=self._stock_to_allocate[response.symbol].allocation_percentage,
+            allocation_percentage=self._stock_to_allocate[
+                response.symbol
+            ].allocation_percentage,
             quantity=response.quantity,
         )
 

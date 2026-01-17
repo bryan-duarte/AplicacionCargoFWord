@@ -1,4 +1,5 @@
 """Test configuration and fixtures for the financial portfolio management system."""
+
 import asyncio
 from collections.abc import Generator
 from decimal import Decimal
@@ -31,15 +32,15 @@ def valid_stock_symbol() -> str:
 def invalid_stock_symbols() -> list[str]:
     """Provides various invalid stock symbols for testing validation."""
     return [
-        "AAA",      # Too short (3 chars)
-        "AAAAA",    # Too long (5 chars)
-        "AA",       # Too short (2 chars)
-        "",         # Empty string
-        "AAAAAA",   # Too long (6 chars)
-        "AA12",     # Contains numbers
-        "A1P2",     # Contains numbers
-        "AA@L",     # Contains special character
-        "    ",     # Only whitespace
+        "AAA",  # Too short (3 chars)
+        "AAAAA",  # Too long (5 chars)
+        "AA",  # Too short (2 chars)
+        "",  # Empty string
+        "AAAAAA",  # Too long (6 chars)
+        "AA12",  # Contains numbers
+        "A1P2",  # Contains numbers
+        "AA@L",  # Contains special character
+        "    ",  # Only whitespace
     ]
 
 
@@ -65,11 +66,11 @@ def maximum_allowed_price() -> Decimal:
 def invalid_stock_prices() -> list[Decimal]:
     """Provides various invalid stock prices for testing validation."""
     return [
-        Decimal("0.00"),      # Zero price
-        Decimal("0.001"),     # Too many decimals
-        Decimal("-1.00"),     # Negative price
-        Decimal("1000000.01"), # Above maximum
-        Decimal("1000001.00"), # Above maximum
+        Decimal("0.00"),  # Zero price
+        Decimal("0.001"),  # Too many decimals
+        Decimal("-1.00"),  # Negative price
+        Decimal("1000000.01"),  # Above maximum
+        Decimal("1000001.00"),  # Above maximum
     ]
 
 
@@ -91,12 +92,10 @@ def sample_portfolio_config(sample_stocks: list[Stock]) -> PortfolioConfig:
         initial_investment=Decimal("10000.00"),
         stocks_to_allocate=[
             StockToAllocate(
-                stock=sample_stocks[0],
-                allocation_percentage=Decimal("0.60")
+                stock=sample_stocks[0], allocation_percentage=Decimal("0.60")
             ),
             StockToAllocate(
-                stock=sample_stocks[1],
-                allocation_percentage=Decimal("0.40")
+                stock=sample_stocks[1], allocation_percentage=Decimal("0.40")
             ),
         ],
     )

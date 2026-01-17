@@ -1,10 +1,8 @@
 ---
 description: Orchestrate testing workflows using python-test-writer and test-reviewer agents. Handles test creation, review, planning, and strategy.
 argument-hint: [operation] [target]
-context: fork
-agent: general-purpose
 allowed-tools: AskUserQuestion, Task, Bash, Read, Write, Edit, Grep, Glob, TodoWrite
-model: sonnet
+model: inherit
 ---
 
 # Test Request Orchestrator
