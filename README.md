@@ -5,7 +5,7 @@
 
 # 🏦 FWord Auto balancer
 
-**Sistema de gestión de portafolios con rebalanceo automático y operaciones atómicas**
+**Sistema de gestión de portafolios con rebalanceo automático y operaciones atómicas** Tu portafolio se autobalancea mientras tú ves netflix ;)
 
 [Python 3.11+] [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -14,19 +14,16 @@
 
 ---
 
-Disclaimer:
+## Disclaimer
 
 Resubmit request: Solicité si podrían reconsiderar mi re-postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación.
 
-En el submit previo, mucho bla bla bla, que patrón de diseño 1,2,3 pero el core del negocio no era atendido. Era bueno para un tutorial, pero no era production grade propio de una postulación a un L2. (IMO)
+En el submit previo, mucho que bla bla bla, que patrón de diseño 1,2,3 pero el core del negocio no era atendido. Era bueno para un tutorial, pero no era production grade propio de una postulación a un L2. (IMO)
 
 Se eliminaron las bobadas y quedó lo clave, que la funcionalidad funcione BIEN, que tenga tests y que maneje los casos que pueden afectar a los usuarios, el resto era bullshit y admito el error. (al menos fué una postulación diferente no(?) jaja )
 
-[-No eliminaré el link del video por si necesito un motivo para ser socialmente excluido en caso de quedar-]
+[- No eliminaré el link del video por si necesito un motivo para ser socialmente excluido en caso de quedar, aquí está: https://youtu.be/bdwrvlV7wQ8 -]
 
-## 📋 Descripción
-
-Sistema de gestión de portafolios de inversión en tiempo real con **rebalanceo automático** basado en cambios de precio de acciones.
 
 ## Uso de LLM's
 Los usos principales de llm para el proyecto estan detallados en docs/ según los requerimietnos del proceso.
@@ -37,7 +34,7 @@ Los usos principales de llm para el proyecto estan detallados en docs/ según lo
 
 ### 🔒 Mecanismo de Locking para Prevenir Rebalanceos Concurrentes
 
-El sistema implementa un **bloqueo distribuido a nivel de portafolio** que previene race conditions durante operaciones críticas:
+El sistema implementa un **bloqueo a nivel de portafolio** que previene race conditions durante operaciones críticas:
 
 - **Bloqueo con TTL**: Tiempo de vida configurable (default: 6 horas, un poco de intuición, pero es referencial) para prevenir deadlocks
 - **Limpieza automática**: El lock expira y se libera automáticamente si el proceso falla
@@ -58,25 +55,25 @@ Todas las operaciones del broker se agrupan en **transacciones atómicas** con r
 
 **¿Por qué importa?** En FWord Acciones, esto significa que **nunca** se dejará a un usuario en un estado inconsistente. Si falla una venta de acciones, la compra correspondiente también se revierte.
 
-Y si falla, el metodo de set_stale podría mandar un aviso por slack y se soluciona en tiempo record (esperamos que no)
+Y si falla, el metodo de set_stale podría mandar un aviso por slack y se soluciona en tiempo record (esperamos que no), se podría incorporar telemetria
 
 ### ⚖️ Rebalanceo Automático "Inteligente"
 
 El sistema detecta y corrige desviaciones de manera automática:
 
-- **Umbral configurable**: Solo rebalancea cuando la desviación supera el threshold (default: 5%, otra vez intuición)
+- **Umbral configurable**: Solo rebalancea cuando la desviación supera el threshold configurado
 - **Cálculo preciso**: Usa aritmética decimal para evitar errores de redondeo financiero (tocó aprender)
-- **Ejecución asíncrona**: Compras y ventas se ejecutan en paralelo para optimizar tiempos
+- **Ejecución asíncrona**: Compras y ventas se ejecutan en paralelo para optimizar tiempos por latencias de red
 - **Validación de reglas**: Verifica que la suma de allocations sea exactamente 100%
 
 **¿Por qué importa?** Los portafolios de los usuarios se mantienen siempre alineados con su estrategia de inversión.
 
-### 💎 Precisión Financiera con Decimal
+### 💎 Precisión Financiera con Decimal (Buen aprendizaje)
 
 Uso sistemático de `Decimal` para evitar floating-point errors:
 
 - **Dinero**: 2 decimales ($10.00)
-- **Cantidad**: 9 decimales (acciones fraccionarias: 1.234567890. Esta vez no es intuición, sino de la documentación de alpaca) https://docs.alpaca.markets/docs/fractional-trading
+- **Cantidad**: 9 decimales (acciones fraccionarias: 1.234567890. (Esta vez no es intuición, sino de la documentación de alpaca https://docs.alpaca.markets/docs/fractional-trading) 
 - **Porcentajes**: 4 decimales (20.0000%)
 
 **¿Por qué importa?** Un error de $0.01 multiplicado por millones de usuarios se convierte en una pérdida significativa. (sino, preguntenle al banco estado, cof cof)
@@ -178,7 +175,7 @@ src/
 
 ## 📦 Instalación
 
-### Opción 1: Con uv (Recomendado, taweno)
+### Opción 1: Con uv
 
 [uv](https://github.com/astral-sh/uv) es un gestor de paquetes Python ultrarrápido.
 
@@ -279,7 +276,7 @@ uv run ruff format src
 El proyecto cuenta con una suite de tests de integración que valida el comportamiento crítico del sistema:
 
 #### TestSimplePortfolioRebalancing
-- **`test_simple_rebalancing_maintains_correct_distribution`**: Verifica que el rebalanceo mantiene la distribución objetivo cuando los precios cambian significativamente
+- **`test_simple_rebalancing_maintains_correct_distribution`**: Verifica que el rebalanceo mantiene la distribución objetivo cuando los precios cambian significativamente (El test base de lo solicitado)
 - **`test_no_rebalancing_when_prices_stable`**: Confirma que no se realizan operaciones innecesarias cuando los precios están estables y dentro del threshold
 
 #### TestHighVolumeRebalancing
