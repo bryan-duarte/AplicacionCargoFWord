@@ -7,7 +7,7 @@
 
 **Sistema de gestión de portafolios con rebalanceo automático y operaciones atómicas** Tu portafolio se autobalancea mientras tú ves netflix ;)
 
-[Python 3.11+] [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[Python] [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 
 </div>
