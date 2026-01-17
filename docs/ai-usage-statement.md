@@ -2,8 +2,8 @@ El desarrollo de la aplicación se dividió en 4 etapas:
 
 
 I - Época de Piedra:
-    descripción: setup de estructura general del proyecto (Streaming de 5 horitas), esto incluye:
-        -Se implementa estructura general del desafió a nivel de componentes principales.
+    descripción: Setup de estructura general del proyecto (Streaming de 5 horitas), esto incluye:
+        -Se implementa estructura general del desafío a nivel de componentes principales.
         -Se diseña algoritmo de rebalanceo.
         -Se implementa flujo con eventos de cambio de precio.
     
@@ -13,7 +13,7 @@ I - Época de Piedra:
         debbug de elemento bloqueante en implementación.
 
 II - Él renacimiento:
-    descripción: despues de reflexionar lo mala que era la implementación previa (el niño 5 horas) respecto a la lógica de negocio clave, se mejoran algunos elementos subyacentes previos a cubrir los componentes clave.
+    descripción: despues de reflexionar lo mala que era la implementación previa (The 5 hours guy) respecto a la lógica de negocio clave, se mejoran algunos elementos subyacentes previos a cubrir los componentes clave.
 
         -Se implementa configuración global de profundidad de decimales según hallazgos en documentación de Alpaca (ver link: https://alpaca.markets/learn/fractional-shares-api )
         -Se incorporan funciones helper en utils para evitar problemas en operaciones con valores de tipo Decimal.
@@ -26,11 +26,13 @@ II - Él renacimiento:
         -Se crea CLAUDE.MD y AGENTS.md para mejor contexto al agente en solicitudes.
     
     USO DE IA EN ESTA ETAPA:
-        -
+        - Sobre todo en lo que fué la implementación de las herramientas utilitarias de gestión de Decimales. (utils/*)
+        -Para cosas así suelo quemar token como loco pidiendo reportes de analisis de puntos de vista y analisis de opciones con tradeoffs a la IA, e ir iterando dudas hasta tener noción de varias opciones y tradeoffs entre las mismas.
+        -Luego ya sería un planning mode de Claude Code e ir iterando.
 
 III-Modernismo:
     descripción: Aquí to bajo el detalle completo de la implementación a realizar con todos los detalles tecnicos de ejecución que debería realizar el agente, describo flujos, modificaciones puntuales a realizar puntuales y uso el planning mode de Claude code para ver puntos ciegos, reviso el plan, solicito ajustes al plan si corresponde y le pido ejecutar el plan.
-    Luego sobre lo que hizo, soy generando modificaciones de limpieza de comentarios, cosas que no se entienden, etc.
+    Luego sobre lo que hizo, soy generando modificaciones de limpieza de comentarios (suelen añadir muuchos comentarios la IA), cosas que no se entienden, etc.
 
     Así fué como bajé las dos funcionalidades clave de negocio en el broker y portafolio.
 

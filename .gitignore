@@ -12,4 +12,6 @@ wheels/
 .mypy_cache
 .ruff_cache
 .pytest_cache
+.docs/requests
+.docs/reports
 

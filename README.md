@@ -16,7 +16,7 @@
 
 ## Disclaimer
 
-Resubmit request: Solicité si podrían reconsiderar mi re-postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación.
+Resubmit request: Solicité si podrían considerar mi re-postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación y ni hablar de pensar muy erroneamente de que tendría valor construir las cosas como artesano del medioevo, más siendo que yo uso mucho la IA.
 
 En el submit previo, mucho que bla bla bla, que patrón de diseño 1,2,3 pero el core del negocio no era atendido. Era bueno para un tutorial, pero no era production grade propio de una postulación a un L2. (IMO)
 
@@ -26,7 +26,7 @@ Se eliminaron las bobadas y quedó lo clave, que la funcionalidad funcione BIEN,
 
 
 ## Uso de LLM's
-Los usos principales de llm para el proyecto estan detallados en docs/ según los requerimietnos del proceso.
+Los usos principales de llm (sí, uso llm, creanme) para el proyecto estan detallados en docs/ según los requerimietnos del proceso.
 
 ---
 

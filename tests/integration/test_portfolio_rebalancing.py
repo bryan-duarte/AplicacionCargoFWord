@@ -1,6 +1,7 @@
 """Integration tests for portfolio rebalancing functionality."""
 
 import asyncio
+import contextlib
 import logging
 from decimal import Decimal
 
@@ -261,7 +262,7 @@ class FailingRollbackBroker(DummyBroker):
 class TestSimplePortfolioRebalancing:
     @pytest.mark.asyncio
     async def test_simple_rebalancing_maintains_correct_distribution(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -335,7 +336,7 @@ class TestSimplePortfolioRebalancing:
 
     @pytest.mark.asyncio
     async def test_no_rebalancing_when_prices_stable(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         market_prices = {
             "AAPL": Decimal("150.00"),
@@ -405,9 +406,7 @@ class TestSimplePortfolioRebalancing:
 class TestHighVolumeRebalancing:
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_rebalancing_with_hundreds_of_random_price_changes(
-        self, reset_registries
-    ):
+    async def test_rebalancing_with_hundreds_of_random_price_changes(self):
         import random
 
         test_stocks = [
@@ -532,7 +531,7 @@ class TestHighVolumeRebalancing:
         )
 
     @pytest.mark.asyncio
-    async def test_rebalancing_with_extreme_price_levels(self, reset_registries):
+    async def test_rebalancing_with_extreme_price_levels(self):
         volatile_stocks = [
             Stock(symbol="VOLA", price=Decimal("100.00")),
             Stock(symbol="VOLB", price=Decimal("100.00")),
@@ -637,7 +636,7 @@ class TestHighVolumeRebalancing:
 class TestRebalanceLockMechanism:
     @pytest.mark.asyncio
     async def test_concurrent_rebalances_are_prevented_by_lock(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         market_prices = {
             "AAPL": Decimal("150.00"),
@@ -657,7 +656,7 @@ class TestRebalanceLockMechanism:
         await portfolio.initialize()
 
         new_price = Decimal("200.00")
-        for symbol in portfolio.allocated_stocks.keys():
+        for symbol in portfolio.allocated_stocks:
             portfolio.update_allocated_stock_price(symbol, new_price)
 
         successful_rebalance_count = 0
@@ -671,10 +670,8 @@ class TestRebalanceLockMechanism:
                 return
 
             successful_rebalance_count += 1
-            try:
+            with contextlib.suppress(Exception):
                 await portfolio.rebalance()
-            except Exception:
-                pass
 
         async def launch_delayed_rebalances():
             await asyncio.sleep(0.05)
@@ -704,7 +701,7 @@ class TestRebalanceLockMechanism:
 
     @pytest.mark.asyncio
     async def test_lock_is_released_after_rebalance_completes(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         market_prices = {
             "AAPL": Decimal("150.00"),
@@ -770,7 +767,7 @@ class TestRebalanceLockMechanism:
 
     @pytest.mark.asyncio
     async def test_lock_is_released_after_rebalance_fails(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         market_prices = {
             "AAPL": Decimal("150.00"),
@@ -792,7 +789,7 @@ class TestRebalanceLockMechanism:
         await portfolio.initialize()
 
         trigger_price = Decimal("50.00")
-        for symbol in portfolio.allocated_stocks.keys():
+        for symbol in portfolio.allocated_stocks:
             portfolio.update_allocated_stock_price(symbol, trigger_price)
 
         assert portfolio.is_locked is False, "Lock should not be held before rebalance"
@@ -838,7 +835,7 @@ class TestRebalanceLockMechanism:
 
     @pytest.mark.asyncio
     async def test_expired_lock_is_acquired_automatically(
-        self, sample_portfolio_config: PortfolioConfig, reset_registries
+        self, sample_portfolio_config: PortfolioConfig
     ):
         from datetime import datetime, timedelta
 
@@ -911,7 +908,7 @@ class TestRebalanceLockMechanism:
 
 class TestRollbackMechanism:
     @pytest.mark.asyncio
-    async def test_rollback_on_partial_rebalance_failure(self, reset_registries):
+    async def test_rollback_on_partial_rebalance_failure(self):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -971,7 +968,7 @@ class TestRollbackMechanism:
 
         # Dramatically change all stock prices to trigger rebalancing
         new_stock_price = Decimal("50.00")
-        for symbol in portfolio.allocated_stocks.keys():
+        for symbol in portfolio.allocated_stocks:
             portfolio.update_allocated_stock_price(symbol, new_stock_price)
 
         # Attempt rebalance which should fail and trigger rollback
@@ -1024,7 +1021,7 @@ class TestRollbackMechanism:
         )
 
     @pytest.mark.asyncio
-    async def test_portfolio_state_consistent_after_rollback(self, reset_registries):
+    async def test_portfolio_state_consistent_after_rollback(self):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -1081,7 +1078,7 @@ class TestRollbackMechanism:
 
         # Dramatically change all stock prices to trigger rebalancing
         new_stock_price = Decimal("50.00")
-        for symbol in portfolio.allocated_stocks.keys():
+        for symbol in portfolio.allocated_stocks:
             portfolio.update_allocated_stock_price(symbol, new_stock_price)
 
         # Attempt rebalance which should fail and trigger rollback
@@ -1136,7 +1133,7 @@ class TestRollbackMechanism:
         )
 
     @pytest.mark.asyncio
-    async def test_stale_state_when_rollback_fails(self, reset_registries):
+    async def test_stale_state_when_rollback_fails(self):
         # Configure initial market prices for all stocks
         initial_market_prices = {
             "AAPL": Decimal("150.00"),
@@ -1191,7 +1188,7 @@ class TestRollbackMechanism:
 
         # Dramatically change all stock prices to trigger rebalancing
         new_stock_price = Decimal("50.00")
-        for symbol in portfolio.allocated_stocks.keys():
+        for symbol in portfolio.allocated_stocks:
             portfolio.update_allocated_stock_price(symbol, new_stock_price)
 
         # Attempt rebalance which should fail and trigger failed rollback

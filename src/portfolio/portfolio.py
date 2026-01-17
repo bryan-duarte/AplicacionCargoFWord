@@ -218,7 +218,7 @@ class Portfolio:
         failed_operations = []
         failed_operations.extend(
             f"{symbol}: {result}"
-            for symbol, result in zip(tasks_by_symbol, results_list)
+            for symbol, result in zip(tasks_by_symbol, results_list, strict=True)
             if isinstance(result, Exception)
         )
 

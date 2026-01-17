@@ -19,20 +19,20 @@ ruff format src
 
 ## Project Overview
 
-This is a Python-based financial portfolio management system demonstrating automatic rebalancing of portfolios based on stock price changes. The system implements an event-driven architecture similar to what might be used in a fintech platform like FWord.
+This is a Python-based financial portfolio management system demonstrating automatic rebalancing of portfolios based on stock price changes. The system implements a registry-based architecture with direct communication patterns similar to what might be used in a fintech platform.
 
 ## Architecture
 
-### Event-Driven Core
+### Communication Flow
 
-The system uses an in-memory async event bus for decoupled communication:
+The system uses direct synchronous communication through a registry pattern:
 
-- **Event Bus** (`src/event_bus/event_bus.py`): Async pub/sub system
-- **Event Types**: `STOCK_PRICE_CHANGE` and `PORTFOLIO_REBALANCE`
-- **Event Handlers** (`src/event_bus/event_handlers.py`): Handle price changes and trigger rebalancing
-- **Event DTOs** (`src/event_bus/event_dtos.py`): Pydantic models for type-safe event data
+- Stock price changes occur in the market
+- `main.py` calls `portfolio_registry.get_by_stock_symbol(symbol)` to find affected portfolios
+- Each portfolio's `rebalance()` method is called directly
+- Portfolio executes buy/sell operations through the broker interface
 
-Flow: Stock price changes → event emitted → portfolio receives via registry → rebalancing triggered
+Flow: Stock price changes → registry lookup via `get_by_stock_symbol()` → direct `rebalance()` call → broker operations
 
 ### Key Modules
 
@@ -43,8 +43,8 @@ Flow: Stock price changes → event emitted → portfolio receives via registry 
 - `errors.py`: Broker-specific exceptions
 
 #### `/src/portfolio/`
-- `portfolio.py`: Portfolio class with auto-rebalancing logic
-- `portfolio_register.py`: Registry for managing portfolios and looking up by stock symbol
+- `portfolio.py`: Portfolio class with auto-rebalancing logic, lock management, and stale state handling
+- `portfolio_register.py`: Registry using `weakref.WeakSet` for automatic memory management
 - `portfolio_dtos.py`: Configuration models (allocation must sum to 100%)
 - `errors.py`: Portfolio-specific exceptions
 
@@ -61,10 +61,11 @@ Flow: Stock price changes → event emitted → portfolio receives via registry 
 
 ### Design Patterns Used
 
-1. **Observer Pattern**: Stocks emit price events, portfolios listen
-2. **Registry Pattern**: `PortfolioRegistry` manages portfolios by stock symbol
-3. **Strategy Pattern**: Broker protocol allows multiple implementations
-4. **Repository Pattern**: NASDAQ fake market as stock repository
+1. **Registry Pattern**: `PortfolioRegistry` uses `weakref.WeakSet` to manage portfolios by stock symbol with automatic memory management
+2. **Strategy Pattern**: `Broker` interface allows multiple implementations (`BanChileBroker`)
+3. **Repository Pattern**: `FakeMarket` acts as a stock data repository
+4. **Command Pattern**: Broker DTOs (`BuyStockByAmountRequest`, `SellStockByQuantityRequest`, etc.) encapsulate operations with UUID tracking
+5. **Batch Processing Pattern**: UUID-based operation grouping with automatic rollback on failure
 
 ## Important Constraints
 
@@ -84,10 +85,80 @@ Flow: Stock price changes → event emitted → portfolio receives via registry 
 
 ## Dependencies
 
+### Core Dependencies
 - `pydantic>=2.12.5`: Data validation and models
 - `mypy>=1.19.1`: Static type checking
 - `ruff>=0.14.11`: Linting and formatting
 
+### Development Dependencies
+- `pytest>=9.0.2`: Testing framework
+- `pytest-asyncio>=1.3.0`: Async test support
+- `pytest-cov>=7.0.0`: Coverage reporting
+- `pytest-freezegun>=0.4.2`: Time manipulation in tests
+- `pytest-mock>=3.15.1`: Mocking utilities
+
 ## Python Version
 
 Requires Python >=3.11
+
+## Testing
+
+### Test Configuration
+- **Configuration file**: `pytest.ini`
+- **Async mode**: `asyncio_mode = auto` for automatic async test support
+- **Test discovery**: `tests/integration/test_*.py`
+
+### Test Structure
+- **Main test file**: `tests/integration/test_portfolio_rebalancing.py`
+- **Fixtures**: `tests/conftest.py` with comprehensive setup for stocks, brokers, and portfolios
+- **Registry cleanup**: Automatic cleanup between tests
+
+### Test Categories
+1. **TestSimplePortfolioRebalancing**: Basic rebalancing functionality
+2. **TestHighVolumeRebalancing**: Performance and edge cases (marked as `@pytest.mark.slow`)
+3. **TestRebalanceLockMechanism**: Concurrency control and lock management
+4. **TestRollbackMechanism**: Transaction rollback and error handling
+
+### Test Doubles
+- **DummyBroker**: Mock broker for controlled testing scenarios
+- **FailingRollbackBroker**: Broker that simulates rollback failures
+
+### Running Tests
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov
+
+# Run only fast tests (exclude slow)
+pytest -m "not slow"
+
+# Run specific test class
+pytest tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing
+```
+
+## Error Handling Architecture
+
+### Exception Hierarchy
+```
+BaseException
+├── BrokerError (with UUID tracking)
+│   ├── BuyStockError
+│   │   └── StockNotFoundError
+│   └── SellStockError
+│       └── BrokerConnectionError
+├── PortfolioError
+│   ├── PortfolioInitializationError (with failed_operations list)
+│   ├── PortfolioRetryError (with attempt tracking)
+│   └── PortfolioStaleError
+└── StockError
+    ├── InvalidSymbolError
+    └── InvalidPriceError
+```
+
+### State Management Patterns
+- **Stale State**: Portfolios enter stale state after failed rollback
+- **Lock Mechanism**: Rebalancing locks prevent concurrent operations with TTL-based expiration
+- **Rollback Pattern**: Batch operations use UUID tracking for atomic semantics (all succeed or all rollback)
+- **Idempotency**: UUID-based operations allow safe retries
