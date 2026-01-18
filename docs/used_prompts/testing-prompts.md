@@ -34,3 +34,50 @@ Revisa con varios paralel taks que se podría simplificar en mi suite de tests, 
     Aquí muchas cosas en el reporte seran bobadas, pero siempre sale alguna cosita que sí vale la pena.
 
 # Iterar, intervenir, modificar en loop.
+
+
+# Test másivo de portfolios
+Esto lo ejecuté con el distributed_task command : .claude/commands/distributed_task.md
+
+Tipo: /distributed_task "{Todo este prompt de abajo como argumento}"
+
+Prompt:
+Queiro que añadas un nuevo test a mi suite de test, quiero que añadas un test que prueba el funcionamiento de mi implementación a gran escala con muuuuuchos portafolios en un registry.
+
+El registry al hay que hacer que sea por default, pero posible de hacer overwrite, similar a lo que ocurre con el market, que es por default el global, pero inyectable uno isolated
+
+El test no debe usar registry global del main de la aplicaicón, sino uno que se instancia y se inyecta en la clase portafolio de los portafolios que se van a instanciar
+
+Crea un market solo para este test, totalmente isolated con varias stocks ficticias, minimo 50, donde los portafolios se van a crear aleatoriamente con cantidades aleatorias entre 10 a 50 stocks.
+
+Donde tambien debes de simular una distribución aleatoria para cada tipo de portafolio, donde esta distribución aleatoria tambien debe de sumar 100 en cada portafolio.
+
+Es crear multiples tipos de portafolios con distribuciones muy diferentes, todos sumando un total de 100% de allocation inicial
+
+Luego las stocks del fake market isolated deben de ir variando de forma ascendente y descendenete en rangos de -3 a +3 porciento
+
+Debes de generar 10 cambios aleatorios en 10 stocks aleatorias.
+
+Luego generar mediante el registry un update de los portfolios que tienen las stocks que cambiaron de precio.
+
+Aquí hay que hacer un assert para validar que todos los portafolios estan balanceados.
+
+Luego generar otros cambios aleatorios,m20 acambios aleatorios esta vez en 20 stocks aleatorias y generar el rebalance de los portfolios que tienen esas stocks.
+
+Aquí hay que hacer otro assert para validar que todos los portafolios estan balanceados.
+
+Luego ya 100 cambios aleatorios en todas las stocks, rebalancear todos los portfolios instanciados en el test.
+
+Y validar con otro assert que todos los portafolios siguen totalmente balanceados.
+
+Usa el test-writter subagent para escribir el test tests, 
+luego valida con el test-validator subagent el test
+luego genera un paralel task que debe de:
+       Validar que el test sigue el patron AAA
+       Validar que el test prueba lo que debe probar y es totalmente isolated con las respectivas depenedency inyection
+       Validar que todas la sintaxis es simple, clara, entendible y sin comentarios innecesarios o sobrecomplejdiad
+
+En caso de que no se cumpla alguna de esas cosas, ajustar, hasta que el test pase la validación de esta ejecución de paralel Task
+Validar finanlmente con el subagent el test creado.
+
+Sigue todo esto paso a paso según lo indicado
