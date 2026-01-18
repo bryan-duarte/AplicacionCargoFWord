@@ -19,7 +19,7 @@ from src.broker.broker_interface import Broker
 from src.config.config import settings
 from src.portfolio.errors import PortfolioError, PortfolioInitializationError
 from src.portfolio.portfolio_dtos import PortfolioConfig, StockToAllocate
-from src.portfolio.portfolio_register import portfolio_registry
+from src.portfolio.portfolio_register import PortfolioRegistry, portfolio_registry
 from src.stock.stock import Stock
 from src.utils.decimal_utils import quantize_money, quantize_quantity
 
@@ -70,6 +70,7 @@ class Portfolio:
         config: PortfolioConfig,
         broker: Broker,
         *,
+        registry: PortfolioRegistry | None = None,
         retail_threshold_usd: int | None = None,
         rebalance_threshold: Decimal | None = None,
     ):
@@ -78,6 +79,7 @@ class Portfolio:
         Args:
             config: Portfolio configuration with name, investment, and stocks
             broker: Broker instance for executing trades
+            registry: Portfolio registry for registration (default: global registry)
             retail_threshold_usd: Threshold for retail classification (default: 25000)
             rebalance_threshold: Minimum quantity difference to trigger rebalancing (default: 0.00)
         """
@@ -87,6 +89,7 @@ class Portfolio:
         self._allocated_stocks: dict[str, AllocatedStock] = {}
         self._broker = broker
         self._stale: bool = False
+        self._registry = registry
 
         self._retail_threshold_usd = (
             retail_threshold_usd if retail_threshold_usd is not None else 25000
@@ -101,7 +104,11 @@ class Portfolio:
         self._rebalance_lock_ttl_seconds: int = config.rebalance_lock_ttl_seconds
 
         self._set_stock_to_allocate(config.stocks_to_allocate)
-        portfolio_registry.add(self)
+
+        active_registry = (
+            self._registry if self._registry is not None else portfolio_registry
+        )
+        active_registry.add(self)
 
     @property
     def portfolio_name(self) -> str:
@@ -204,9 +211,12 @@ class Portfolio:
 
         tasks_by_symbol: dict[str, Awaitable[BuyStockResponse]] = {}
         for stock in self._stock_to_allocate.values():
+            amount = quantize_money(
+                self._initial_investment * stock.allocation_percentage
+            )
             request = BuyStockByAmountRequest(
                 symbol=stock.stock.symbol,
-                amount=self._initial_investment * stock.allocation_percentage,
+                amount=amount,
                 batch_uuid=batch_uuid,
             )
             tasks_by_symbol[request.symbol] = self._buy_stock_by_amount(request)
@@ -331,40 +341,48 @@ class Portfolio:
             ]
             failures = buy_failures + sell_failures
 
-            if failures:
-                has_successful_operations = any(
-                    isinstance(result, (BuyStockResponse, SellStockResponse))
-                    for result in (*buy_results, *sell_results)
-                )
-
-                if has_successful_operations:
-                    rollback_success = await self._broker.batch_rollback(batch_uuid)
-
-                    if not rollback_success:
-                        self.set_stale_state()
-                        raise PortfolioError(
-                            "Rebalancing failed. Rollback also failed. Stale state."
-                        )
-
-                    raise PortfolioError(
-                        "Rebalancing failed. Rolled back partial executions in broker."
+            if not failures:
+                for response in buy_results:
+                    if isinstance(response, BuyStockResponse):
+                        self._allocated_stocks[
+                            response.symbol
+                        ].quantity += response.quantity
+                    logging.info(
+                        f"Buy operation to balance the {self.portfolio_name} portfolio result: {response.symbol} : Q: {response.quantity}"
                     )
 
+                for response in sell_results:
+                    if isinstance(response, SellStockResponse):
+                        self._allocated_stocks[
+                            response.symbol
+                        ].quantity -= response.quantity
+                    logging.info(
+                        f"Sell operation to balance the {self.portfolio_name} portfolio result: {response.symbol} : Q: {response.quantity}"
+                    )
+
+                return
+
+            has_successful_operations = any(
+                isinstance(result, (BuyStockResponse, SellStockResponse))
+                for result in (*buy_results, *sell_results)
+            )
+
+            if not has_successful_operations:
                 raise PortfolioError(
                     f"Rebalancing failed: {'; '.join(str(e) for e in failures)}"
                 )
 
-            for response in buy_results:
-                if isinstance(response, BuyStockResponse):
-                    self._allocated_stocks[
-                        response.symbol
-                    ].quantity += response.quantity
+            rollback_success = await self._broker.batch_rollback(batch_uuid)
 
-            for response in sell_results:
-                if isinstance(response, SellStockResponse):
-                    self._allocated_stocks[
-                        response.symbol
-                    ].quantity -= response.quantity
+            if rollback_success:
+                raise PortfolioError(
+                    "Rebalancing failed. Rolled back partial executions in broker."
+                )
+
+            self.set_stale_state()
+            raise PortfolioError(
+                "Rebalancing failed. Rollback also failed. Stale state."
+            )
 
         finally:
             self._is_rebalancing = False

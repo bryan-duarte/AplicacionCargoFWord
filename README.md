@@ -180,7 +180,7 @@ src/
 [uv](https://github.com/astral-sh/uv) es un gestor de paquetes Python ultrarrápido.
 
 ```bash
-# Instalar uv (si no lo tienes)
+# Instalar uv (si no lo tienes, ta weno)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clonar el repositorio
@@ -232,39 +232,28 @@ uv run main.py
 python main.py
 ```
 
-**Salida esperada:**
-
-```
-2026-01-16 10:30:00 [    INFO] Starting portfolio management system
-2026-01-16 10:30:00 [    INFO] Creating portfolio with initial investment: $100,000
-2026-01-16 10:30:00 [    INFO]   - META: 33.33% allocation
-2026-01-16 10:30:00 [    INFO]   - AAPL: 33.33% allocation
-2026-01-16 10:30:00 [    INFO]   - MSFT: 33.34% allocation
-
-2026-01-16 10:30:03 [    INFO] 📈 META price changed: $400.00 -> $440.00 (+10.00%)
-2026-01-16 10:30:05 [    INFO] Portfolio deviation detected: 8.50% > 5.00% threshold
-2026-01-16 10:30:05 [    INFO] 🔄 Rebalancing portfolio...
-
-[BanChileBroker] Batch operation started: uuid-1234
-[BanChileBroker] Buying 15.25 shares of AAPL at $165.00
-[BanChileBroker] Selling 20.50 shares of META at $440.00
-[BanChileBroker] Batch completed successfully
-
-2026-01-16 10:30:08 [    INFO] ✅ Rebalance completed successfully
-```
-
 ### Ejecutar Commands de Desarrollo
 
 ```bash
 # Type checking
+# Con uv
 uv run mypy .
+# Sin uv
+mypy .
 
 # Linting
+# Con uv
 uv run ruff check .
 uv run ruff check --fix .
+# Sin uv
+ruff check .
+ruff check --fix .
 
 # Formatting
+# Con uv
 uv run ruff format src
+# Sin uv
+ruff format src
 ```
 
 ---
@@ -294,56 +283,65 @@ El proyecto cuenta con una suite de tests de integración que valida el comporta
 - **`test_portfolio_state_consistent_after_rollback`**: Verifica la consistencia completa del estado del portafolio después de un rollback exitoso
 - **`test_stale_state_when_rollback_fails`**: Prueba que el portafolio entra en estado stale cuando falla el rollback, bloqueando operaciones posteriores
 
+#### TestLargeScaleRegistryRebalancing
+- **`test_large_scale_rebalancing_with_many_portfolios`**: Test de carga masiva que valida el sistema con 100 portafolios y 50 acciones ante múltiples olas de cambios de precios (10, 20 y 100 cambios)
+
 ### Ejecutar Tests con Logging INFO
 
 Para ver los logs en tiempo real mientras ejecutas los tests:
 
 ```bash
-# Todos los tests con logging
+# Con uv
 uv run pytest tests/ -v --log-cli-level=INFO --log-cli-format='%(asctime)s [%(levelname)8s] %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
+
+# Sin uv (entorno virtual activado)
+pytest tests/ -v --log-cli-level=INFO --log-cli-format='%(asctime)s [%(levelname)8s] %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
 ```
 
 ### Opciones de Testing
 
 ```bash
 # Ejecutar con nivel DEBUG para mayor detalle
+# Con uv
 uv run pytest tests/ -v --log-cli-level=DEBUG --log-cli-format='%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
+# Sin uv
+pytest tests/ -v --log-cli-level=DEBUG --log-cli-format='%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
 
 # Tests específicos de rebalanceo
+# Con uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py -v --log-cli-level=INFO
+# Sin uv
+pytest tests/integration/test_portfolio_rebalancing.py -v --log-cli-level=INFO
 
 # Una clase específica
+# Con uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing -v --log-cli-level=INFO
+# Sin uv
+pytest tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing -v --log-cli-level=INFO
 
 # Con coverage report
+# Con uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py --cov=src/portfolio --cov=src/broker --cov-report=term-missing -v --log-cli-level=INFO
+# Sin uv
+pytest tests/integration/test_portfolio_rebalancing.py --cov=src/portfolio --cov=src/broker --cov-report=term-missing -v --log-cli-level=INFO
 
 # Sin logs (ejecución rápida)
+# Con uv
 uv run pytest tests/ -v
-```
+# Sin uv
+pytest tests/ -v
 
-### Ejemplo de Salida con Logs
+# Excluir tests lentos (marcados como @pytest.mark.slow)
+# Con uv
+uv run pytest tests/ -v -m "not slow"
+# Sin uv
+pytest tests/ -v -m "not slow"
 
-```
-============================= test session starts ==============================
-collected 5 items
-
-tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing::test_rebalance_when_price_changes PASSED
-2026-01-16 10:35:12 [    INFO] Creating dummy broker for testing
-2026-01-16 10:35:12 [    INFO] Initializing portfolio with 3 stocks
-2026-01-16 10:35:13 [    INFO] Stock AAPL price changed: $150.00 -> $165.00 (+10.00%)
-2026-01-16 10:35:13 [    INFO] Portfolio deviation detected: 12.50% > 5.00% threshold
-2026-01-16 10:35:13 [    INFO] Rebalancing portfolio: Buying AAPL, Selling GOOGL
-
-tests/integration/test_portfolio_rebalancing.py::TestPortfolioLocking::test_concurrent_rebalance_prevention PASSED
-2026-01-16 10:35:15 [    INFO] Acquired rebalance lock
-2026-01-16 10:35:15 [    INFO] Second rebalance attempt blocked - lock held by another process
-
-tests/integration/test_portfolio_rebalancing.py::TestBatchRollback::test_rollback_on_failure PASSED
-2026-01-16 10:35:17 [    INFO] Batch operation failed, starting rollback
-2026-01-16 10:35:18 [    INFO] Rollback completed - portfolio in stale state
-
-============================== 5 passed in 6.42s ==============================
+# Solo tests lentos
+# Con uv
+uv run pytest tests/ -v -m "slow"
+# Sin uv
+pytest tests/ -v -m "slow"
 ```
 
 ---
@@ -374,7 +372,8 @@ FWord-software-engineer-apply/
 │
 ├── tests/
 │   └── integration/             # Tests de integración
-│       └── test_portfolio_rebalancing.py
+│       ├── test_portfolio_rebalancing.py
+│       └── test_large_scale_registry_rebalancing.py
 │
 ├── main.py                      # Demo de la aplicación
 ├── README.md                    # Este archivo
