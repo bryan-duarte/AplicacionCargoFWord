@@ -53,9 +53,9 @@ Todas las operaciones del broker se agrupan en **transacciones atómicas** con r
 - **Reintentos configurables**: Hasta 3 reintentos con delay configurable para operaciones de rollback
 - **Logging completo**: Toda la traza de operaciones queda registrada para auditoría
 
-**¿Por qué importa?** En FWord Acciones, esto significa que **nunca** se dejará a un usuario en un estado inconsistente. Si falla una venta de acciones, la compra correspondiente también se revierte.
+**¿Por qué importa?** En FWord Acciones, esto significa que **nunca** se dejará a un usuario en un estado inconsistente. Si fallan algunas operaciones en un lote de operaciones, las que fueron exitosas se revierten.
 
-Y si falla, el metodo de set_stale podría mandar un aviso por slack y se soluciona en tiempo record (esperamos que no), se podría incorporar telemetria
+Y si falla, el metodo de set_stale podría mandar un aviso por slack y se soluciona en tiempo record (esperamos que no), se podría incorporar telemetria para medir cuanto ocurre también.
 
 ### ⚖️ Rebalanceo Automático "Inteligente"
 
