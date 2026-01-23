@@ -1,392 +1,388 @@
-<img width="1584" height="672" alt="image" src="https://github.com/user-attachments/assets/3589e35c-c816-486c-bebf-834b521abbc7" />
-
+<img width="1584" height="672" alt="Portfolio Management System Architecture" src="https://github.com/user-attachments/assets/3589e35c-c816-486c-bebf-834b521abbc7" />
 
 <div align="center">
 
-# 🏦 FWord Auto balancer
+# Fintech Portfolio Auto-Balancer
 
-**Sistema de gestión de portafolios con rebalanceo automático y operaciones atómicas** Tu portafolio se autobalancea mientras tú ves netflix ;)
+**Portfolio Management System with Automatic Rebalancing and Atomic Operations**
 
 [Python] [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-
 
 </div>
 
 ---
 
-## Disclaimer
+## About This Project
 
-Resubmit request: Solicité si podrían considerar mi re-postulación, ya que reflexionando leugo del primer submit me di cuenta que hice puras bobadas y no me enfoque en el caso de negocio adyacente relevante en la implementación y ni hablar de pensar muy erroneamente de que tendría valor construir las cosas como artesano del medioevo, más siendo que yo uso mucho la IA.
+This is a **fintech challenge demonstration** originally created as a solution to a traditional technical interview challenge common in many fintech companies. It has been made public to showcase production-grade software engineering practices applied to financial portfolio management.
 
-En el submit previo, mucho que bla bla bla, que patrón de diseño 1,2,3 pero el core del negocio no era atendido. Era bueno para un tutorial, pero no era production grade propio de una postulación a un L2. (IMO)
+The project demonstrates a portfolio management system that automatically rebalances investment portfolios based on stock price changes, with enterprise-grade features including:
 
-Se eliminaron las bobadas y quedó lo clave, que la funcionalidad funcione BIEN, que tenga tests y que maneje los casos que pueden afectar a los usuarios, el resto era bullshit y admito el error. (al menos fué una postulación diferente no(?) jaja )
+- **Automatic rebalancing** with configurable thresholds
+- **Atomic batch operations** with automatic rollback
+- **Lock-based concurrency control** to prevent race conditions
+- **Financial precision** using Python's `Decimal` type
+- **Comprehensive test suite** covering edge cases and failure scenarios
 
-[- No eliminaré el link del video por si necesito un motivo para ser socialmente excluido en caso de quedar, aquí está: https://youtu.be/bdwrvlV7wQ8 -]
-
-
-## Uso de LLM's
-Los usos principales de llm (sí, uso llm, creanme) para el proyecto estan detallados en docs/ según los requerimietnos del proceso.
-
----
-
-## ✨ Features Destacados (Que atienden una negecidad de negocio y que sí importan)
-
-### 🔒 Mecanismo de Locking para Prevenir Rebalanceos Concurrentes
-
-El sistema implementa un **bloqueo a nivel de portafolio** que previene race conditions durante operaciones críticas:
-
-- **Bloqueo con TTL**: Tiempo de vida configurable (default: 6 horas, un poco de intuición, pero es referencial) para prevenir deadlocks
-- **Limpieza automática**: El lock expira y se libera automáticamente si el proceso falla
-- **Prevención de operaciones simultáneas**: Garantiza que solo un rebalanceo ocurra a la vez
-- **Detección de locks expirados**: Permite recuperar portafolios en caso de fallos
-
-**¿Por qué importa?** En un sistema de producción donde múltiples eventos pueden disparar rebalanceos concurrentemente, este mecanismo protege la integridad de los datos del portafolio del usuario.
-
-### 🔄 Rollback Automático de Operaciones Batch
-
-Todas las operaciones del broker se agrupan en **transacciones atómicas** con rollback automático:
-
-- **Operaciones atómicas**: Todas las compras/ventas en un rebalanceo se ejecutan como una unidad
-- **Seguimiento de estado**: Cada operación tiene estados 
-- **Compensación automática**: Si alguna operacion falla, las exitosas se revierten automáticamente ejecutando la acción contraria
-- **Reintentos configurables**: Hasta 3 reintentos con delay configurable para operaciones de rollback
-- **Logging completo**: Toda la traza de operaciones queda registrada para auditoría
-
-**¿Por qué importa?** En FWord Acciones, esto significa que **nunca** se dejará a un usuario en un estado inconsistente. Si fallan algunas operaciones en un lote de operaciones, las que fueron exitosas se revierten.
-
-Y si falla, el metodo de set_stale podría mandar un aviso por slack y se soluciona en tiempo record (esperamos que no), se podría incorporar telemetria para medir cuanto ocurre también.
-
-### ⚖️ Rebalanceo Automático "Inteligente"
-
-El sistema detecta y corrige desviaciones de manera automática:
-
-- **Umbral configurable**: Solo rebalancea cuando la desviación supera el threshold configurado
-- **Cálculo preciso**: Usa aritmética decimal para evitar errores de redondeo financiero (tocó aprender)
-- **Ejecución asíncrona**: Compras y ventas se ejecutan en paralelo para optimizar tiempos por latencias de red
-- **Validación de reglas**: Verifica que la suma de allocations sea exactamente 100%
-
-**¿Por qué importa?** Los portafolios de los usuarios se mantienen siempre alineados con su estrategia de inversión.
-
-### 💎 Precisión Financiera con Decimal (Buen aprendizaje)
-
-Uso sistemático de `Decimal` para evitar floating-point errors:
-
-- **Dinero**: 2 decimales ($10.00)
-- **Cantidad**: 9 decimales (acciones fraccionarias: 1.234567890. (Esta vez no es intuición, sino de la documentación de alpaca https://docs.alpaca.markets/docs/fractional-trading) 
-- **Porcentajes**: 4 decimales (20.0000%)
-
-**¿Por qué importa?** Un error de $0.01 multiplicado por millones de usuarios se convierte en una pérdida significativa. (sino, preguntenle al banco estado, cof cof)
-
+> **Note**: This is a demonstration project showcasing software engineering practices for fintech applications. It is not financial advice or a real production trading system.
 
 ---
 
-## 🏗️ Arquitectura
+## AI Usage Documentation
 
-### Módulos Principales
+The development process of this project involved the use of Large Language Models (LLMs) as coding assistants. Detailed documentation of how AI tools were used throughout development can be found in [`docs/ai-usage-statement.md`](docs/ai-usage-statement.md).
+
+---
+
+## Key Features (Business-Critical Functionality)
+
+### Locking Mechanism for Concurrent Rebalancing Prevention
+
+The system implements **portfolio-level locking** to prevent race conditions during critical operations:
+
+- **TTL-based Locks**: Configurable time-to-live (default: 6 hours) prevents deadlocks
+- **Automatic Cleanup**: Locks expire automatically if the process fails
+- **Concurrent Operation Prevention**: Ensures only one rebalance occurs at a time
+- **Expired Lock Detection**: Allows portfolio recovery after failures
+
+**Why this matters**: In production where multiple events can trigger concurrent rebalances, this mechanism protects user portfolio data integrity.
+
+### Automatic Rollback for Batch Operations
+
+All broker operations are grouped into **atomic transactions** with automatic rollback:
+
+- **Atomic Operations**: All buy/sell operations in a rebalance execute as a unit
+- **State Tracking**: Each operation has tracked states
+- **Automatic Compensation**: If any operation fails, successful ones automatically reverse
+- **Configurable Retries**: Up to 3 retries with configurable delay for rollback operations
+- **Complete Logging**: Full operation trace for audit purposes
+
+**Why this matters**: In production trading systems, this means users are **never** left in an inconsistent state. If some operations in a batch fail, successful ones are automatically reversed.
+
+If rollback fails, the `set_stale` method can send alerts (e.g., via Slack) for rapid resolution. Telemetry can be incorporated to measure failure rates.
+
+### Intelligent Automatic Rebalancing
+
+The system detects and corrects deviations automatically:
+
+- **Configurable Threshold**: Only rebalances when deviation exceeds the configured threshold
+- **Precise Calculation**: Uses decimal arithmetic to avoid financial rounding errors
+- **Asynchronous Execution**: Buy/sell operations execute in parallel to optimize network latency
+- **Rule Validation**: Verifies allocation sums equal exactly 100%
+
+**Why this matters**: User portfolios remain aligned with their investment strategy automatically.
+
+### Financial Precision with Decimal
+
+Systematic use of `Decimal` to avoid floating-point errors:
+
+- **Money**: 2 decimals ($10.00)
+- **Quantity**: 9 decimals (fractional shares: 1.234567890) - Based on [Alpaca's documentation](https://docs.alpaca.markets/docs/fractional-trading)
+- **Percentages**: 4 decimals (20.0000%)
+
+**Why this matters**: A $0.01 error multiplied by millions of users becomes a significant loss.
+
+---
+
+## Architecture
+
+### Core Modules
 
 ```
 src/
-├── broker/              # Intermediario financiero con operaciones atómicas
-│   ├── broker_interface.py    # Protocolo abstracto del broker
-│   ├── broker.py               # BanChileBroker con rollback automático
-│   ├── broker_dtos.py          # Modelos de datos para operaciones
-│   └── errors.py               # Excepciones específicas
+├── broker/              # Financial intermediary with atomic operations
+│   ├── broker_interface.py    # Abstract broker protocol
+│   ├── broker.py               # BanChileBroker with automatic rollback
+│   ├── broker_dtos.py          # Operation data models
+│   └── errors.py               # Broker-specific exceptions
 │
-├── portfolio/           # Gestión de portafolios con rebalanceo
-│   ├── portfolio.py            # Portfolio con locking y rebalanceo
-│   ├── portfolio_dtos.py       # Configuración y validaciones
-│   ├── portfolio_register.py   # Registry de portafolios con símbolo
-│   └── errors.py               # Excepciones específicas
+├── portfolio/           # Portfolio management with rebalancing
+│   ├── portfolio.py            # Portfolio with locking and rebalancing
+│   ├── portfolio_dtos.py       # Configuration and validations
+│   ├── portfolio_register.py   # Portfolio registry by symbol
+│   └── errors.py               # Portfolio-specific exceptions
 │
-├── stock/               # Entidades de acciones
-│   ├── stock.py                # Stock con validación de símbolo/precio
-│   └── errors.py               # Excepciones específicas
+├── stock/               # Stock entities
+│   ├── stock.py                # Stock with symbol/price validation
+│   └── errors.py               # Stock-specific exceptions
 │
-├── config/              # Configuración centralizada
-│   └── config.py               # Settings inmutables del sistema
+├── config/              # Centralized configuration
+│   └── config.py               # Immutable system settings
 │
-└── utils/               # Utilidades compartidas
-    ├── decimal_utils.py        # Cuantización de decimales
-    └── fake_market.py          # Simulador de mercado NASDAQ
+└── utils/               # Shared utilities
+    ├── decimal_utils.py        # Decimal quantization
+    └── fake_market.py          # NASDAQ market simulator
 ```
 
-### Flujo de Rebalanceo
+### Rebalancing Flow
 
 ```
 ┌─────────────────┐
-│ Precio cambia   │
+│ Price changes   │
 │ (META: $400)    │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────────────────┐
-│ Registry detecta portafolios │
-│ afectados por el símbolo     │
+│ Registry detects portfolios │
+│ affected by symbol          │
 └────────┬────────────────────┘
          │
          ▼
 ┌─────────────────────────────────┐
-│ Calcula desviación vs objetivo  │
-│ ¿Supera threshold (5%)?         │
+│ Calculate deviation vs target   │
+│ Exceeds threshold (5%)?         │
 └────────┬────────────────────────┘
          │ NO
-         ├─────────────────────► (Fin - no rebalancear)
-         │ SÍ
+         ├─────────────────────► (End - no rebalance)
+         │ YES
          ▼
 ┌─────────────────────────────┐
-│ Adquirir lock de rebalanceo │
-│ ¿Disponible?                │
+│ Acquire rebalance lock      │
+│ Available?                  │
 └────────┬────────────────────┘
          │ NO
-         ├─────────────────────► (Fin - ya hay rebalanceo en curso)
-         │ SÍ
+         ├─────────────────────► (End - rebalance in progress)
+         │ YES
          ▼
 ┌──────────────────────────────────────┐
-│ Calcular operaciones necesarias      │
-│ - Comprar stocks con déficit         │
-│ - Vender stocks con exceso           │
+│ Calculate required operations        │
+│ - Buy stocks with deficit            │
+│ - Sell stocks with surplus           │
 └────────┬─────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────┐
-│ Ejecutar operaciones en batch       │
-│ (asyncio.gather en paralelo)        │
-└────────┬────────────────────────────┘
+│ Execute batch operations            │
+│ (asyncio.gather in parallel)        │
+└────────┬─────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────┐
-│ ¿Todas exitosas?            │
+│ All successful?             │
 └────────┬────────────────────┘
-         │ SÍ
-         ├─────────────────────► Actualizar cantidades ✓
+         │ YES
+         ├─────────────────────► Update quantities ✓
          │
          │ NO
          ▼
 ┌─────────────────────────────────┐
-│ 🔴 Rollback automático          │
-│ - Ejecutar operaciones inversas │
-│ - Marcar portafolio como STALE  │
-│ - Requiere intervención manual  │
+│ 🔴 Automatic Rollback           │
+│ - Execute reverse operations    │
+│ - Mark portfolio as STALE       │
+│ - Requires manual intervention  │
 └─────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Instalación
+## Installation
 
-### Opción 1: Con uv
+### Option 1: With uv
 
-[uv](https://github.com/astral-sh/uv) es un gestor de paquetes Python ultrarrápido.
+[uv](https://github.com/astral-sh/uv) is an ultra-fast Python package manager.
 
 ```bash
-# Instalar uv (si no lo tienes, ta weno)
+# Install uv (if you don't have it)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clonar el repositorio
+# Clone the repository
 git clone <repo-url>
-cd FWord-software-engineer-apply
+cd fintech-portfolio-rebalancing
 
-# Instalar dependencias
+# Install dependencies
 uv sync
 
-# Activar el entorno virtual
-source .venv/bin/activate  # En Linux/Mac
-# o
-.venv\Scripts\activate     # En Windows
+# Activate virtual environment
+source .venv/bin/activate  # On Linux/Mac
+# or
+.venv\Scripts\activate     # On Windows
 ```
 
-### Opción 2: Sin uv (Con pip)
+### Option 2: Without uv (Using pip)
 
 ```bash
-# Crear entorno virtual
+# Create virtual environment
 python3.11 -m venv .venv
-source .venv/bin/activate  # En Linux/Mac
-# o
-.venv\Scripts\activate     # En Windows
+source .venv/bin/activate  # On Linux/Mac
+# or
+.venv\Scripts\activate     # On Windows
 
-# Instalar dependencias
+# Install dependencies
 pip install -e .
 pip install mypy pydantic ruff pytest pytest-asyncio pytest-cov pytest-freezegun pytest-mock
 ```
 
-### Requisitos del Sistema
-
-- **Python**: >= 3.11
-- **Sistema Operativo**: Linux, macOS, Windows
-- **Memoria**: Mínimo 512 MB RAM
-- **Red**: Conexión a internet para descargar dependencias
-
-(Gracias Claude por este parrafo totalmente inventado)
 ---
 
-## 🚀 Uso
+## Usage
 
-### Ejecutar la Aplicación Principal
+### Running the Main Application
 
 ```bash
-# Con uv
+# With uv
 uv run main.py
 
-# Sin uv (entorno virtual activado)
+# Without uv (virtual environment activated)
 python main.py
 ```
 
-### Ejecutar Commands de Desarrollo
+### Development Commands
 
 ```bash
 # Type checking
-# Con uv
+# With uv
 uv run mypy .
-# Sin uv
+# Without uv
 mypy .
 
 # Linting
-# Con uv
+# With uv
 uv run ruff check .
 uv run ruff check --fix .
-# Sin uv
+# Without uv
 ruff check .
 ruff check --fix .
 
 # Formatting
-# Con uv
+# With uv
 uv run ruff format src
-# Sin uv
+# Without uv
 ruff format src
 ```
 
 ---
 
-## 🧪 Testing
+## Testing
 
-### Tests Implementados
+### Implemented Tests
 
-El proyecto cuenta con una suite de tests de integración que valida el comportamiento crítico del sistema:
+The project includes a comprehensive integration test suite validating critical system behavior:
 
 #### TestSimplePortfolioRebalancing
-- **`test_simple_rebalancing_maintains_correct_distribution`**: Verifica que el rebalanceo mantiene la distribución objetivo cuando los precios cambian significativamente (El test base de lo solicitado)
-- **`test_no_rebalancing_when_prices_stable`**: Confirma que no se realizan operaciones innecesarias cuando los precios están estables y dentro del threshold
+- **`test_simple_rebalancing_maintains_correct_distribution`**: Verifies rebalancing maintains target distribution when prices change significantly (the core requirement)
+- **`test_no_rebalancing_when_prices_stable`**: Confirms no unnecessary operations when prices are stable within threshold
 
 #### TestHighVolumeRebalancing
-- **`test_rebalancing_with_hundreds_of_random_price_changes`**: Test de carga que valida el sistema ante 200 cambios de precios aleatorios con checkpoints de validación
-- **`test_rebalancing_with_extreme_price_levels`**: Prueba el rebalanceo ante escenarios de volatilidad extrema con precios variables
+- **`test_rebalancing_with_hundreds_of_random_price_changes`**: Load test validating system against 200 random price changes with validation checkpoints
+- **`test_rebalancing_with_extreme_price_levels`**: Tests rebalancing under extreme volatility scenarios
 
 #### TestRebalanceLockMechanism
-- **`test_concurrent_rebalances_are_prevented_by_lock`**: Verifica que el mecanismo de locking previene race conditions durante rebalanceos concurrentes
-- **`test_lock_is_released_after_rebalance_completes`**: Confirma que el lock se libera correctamente tras un rebalanceo exitoso
-- **`test_lock_is_released_after_rebalance_fails`**: Asegura que el lock se libera incluso cuando el rebalanceo falla
-- **`test_expired_lock_is_acquired_automatically`**: Prueba la recuperación automática cuando un lock ha expirado
+- **`test_concurrent_rebalances_are_prevented_by_lock`**: Verifies locking prevents race conditions during concurrent rebalances
+- **`test_lock_is_released_after_rebalance_completes`**: Confirms lock releases after successful rebalance
+- **`test_lock_is_released_after_rebalance_fails`**: Ensures lock releases even when rebalance fails
+- **`test_expired_lock_is_acquired_automatically`**: Tests automatic recovery when a lock has expired
 
 #### TestRollbackMechanism
-- **`test_rollback_on_partial_rebalance_failure`**: Valida que las operaciones exitosas se revierten cuando alguna operación falla
-- **`test_portfolio_state_consistent_after_rollback`**: Verifica la consistencia completa del estado del portafolio después de un rollback exitoso
-- **`test_stale_state_when_rollback_fails`**: Prueba que el portafolio entra en estado stale cuando falla el rollback, bloqueando operaciones posteriores
+- **`test_rollback_on_partial_rebalance_failure`**: Validates successful operations reverse when any operation fails
+- **`test_portfolio_state_consistent_after_rollback`**: Verifies complete portfolio state consistency after successful rollback
+- **`test_stale_state_when_rollback_fails`**: Tests portfolio enters stale state when rollback fails, blocking subsequent operations
 
 #### TestLargeScaleRegistryRebalancing
-- **`test_large_scale_rebalancing_with_many_portfolios`**: Test de carga masiva que valida el sistema con 100 portafolios y 50 acciones ante múltiples olas de cambios de precios (10, 20 y 100 cambios)
+- **`test_large_scale_rebalancing_with_many_portfolios`**: Massive load test validating system with 100 portfolios and 50 stocks across multiple waves of price changes (10, 20, and 100 changes)
 
-### Ejecutar Tests con Logging INFO
+### Running Tests with INFO Logging
 
-Para ver los logs en tiempo real mientras ejecutas los tests:
+To see logs in real-time while running tests:
 
 ```bash
-# Con uv
+# With uv
 uv run pytest tests/ -v --log-cli-level=INFO --log-cli-format='%(asctime)s [%(levelname)8s] %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
 
-# Sin uv (entorno virtual activado)
+# Without uv (virtual environment activated)
 pytest tests/ -v --log-cli-level=INFO --log-cli-format='%(asctime)s [%(levelname)8s] %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
 ```
 
-### Opciones de Testing
+### Testing Options
 
 ```bash
-# Ejecutar con nivel DEBUG para mayor detalle
-# Con uv
+# Run with DEBUG level for more detail
+# With uv
 uv run pytest tests/ -v --log-cli-level=DEBUG --log-cli-format='%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
-# Sin uv
+# Without uv
 pytest tests/ -v --log-cli-level=DEBUG --log-cli-format='%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(message)s' --log-cli-date-format='%Y-%m-%d %H:%M:%S'
 
-# Tests específicos de rebalanceo
-# Con uv
+# Specific rebalancing tests
+# With uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py -v --log-cli-level=INFO
-# Sin uv
+# Without uv
 pytest tests/integration/test_portfolio_rebalancing.py -v --log-cli-level=INFO
 
-# Una clase específica
-# Con uv
+# Specific test class
+# With uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing -v --log-cli-level=INFO
-# Sin uv
+# Without uv
 pytest tests/integration/test_portfolio_rebalancing.py::TestSimplePortfolioRebalancing -v --log-cli-level=INFO
 
-# Con coverage report
-# Con uv
+# With coverage report
+# With uv
 uv run pytest tests/integration/test_portfolio_rebalancing.py --cov=src/portfolio --cov=src/broker --cov-report=term-missing -v --log-cli-level=INFO
-# Sin uv
+# Without uv
 pytest tests/integration/test_portfolio_rebalancing.py --cov=src/portfolio --cov=src/broker --cov-report=term-missing -v --log-cli-level=INFO
 
-# Sin logs (ejecución rápida)
-# Con uv
+# Fast execution (no logs)
+# With uv
 uv run pytest tests/ -v
-# Sin uv
+# Without uv
 pytest tests/ -v
 
-# Excluir tests lentos (marcados como @pytest.mark.slow)
-# Con uv
+# Exclude slow tests (marked as @pytest.mark.slow)
+# With uv
 uv run pytest tests/ -v -m "not slow"
-# Sin uv
+# Without uv
 pytest tests/ -v -m "not slow"
 
-# Solo tests lentos
-# Con uv
+# Only slow tests
+# With uv
 uv run pytest tests/ -v -m "slow"
-# Sin uv
+# Without uv
 pytest tests/ -v -m "slow"
 ```
 
 ---
 
-## 🛠️ Stack Técnico
+## Technical Stack
 
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Python** | 3.11+ | Lenguaje principal |
-| **Pydantic** | >= 2.12.5 | Validación de datos y modelos |
-| **pytest** | >= 9.0.2 | Framework de testing |
-| **mypy** | >= 1.19.1 | Type checking estático |
-| **ruff** | >= 0.14.11 | Linter ultra-rápido (reemplaza flake8, pylint, isort) y formatter (reemplaza black) |
-| **asyncio** | (stdlib) | Programación asíncrona en Python |
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Python** | 3.11+ | Main language |
+| **Pydantic** | >= 2.12.5 | Data validation and models |
+| **pytest** | >= 9.0.2 | Testing framework |
+| **mypy** | >= 1.19.1 | Static type checking |
+| **ruff** | >= 0.14.11 | Ultra-fast linter (replaces flake8, pylint, isort) and formatter (replaces black) |
+| **asyncio** | (stdlib) | Asynchronous programming in Python |
 
 ---
 
-## 📁 Estructura del Proyecto
+## Project Structure
 
 ```
-FWord-software-engineer-apply/
+fintech-portfolio-rebalancing/
 ├── src/
-│   ├── broker/                  # Broker con operaciones batch y rollback
-│   ├── config/                  # Configuración centralizada e inmutable
-│   ├── portfolio/               # Gestión de portafolios con rebalanceo
-│   ├── stock/                   # Entidades de acciones
-│   └── utils/                   # Utilidades compartidas
+│   ├── broker/                  # Broker with batch operations and rollback
+│   ├── config/                  # Centralized, immutable configuration
+│   ├── portfolio/               # Portfolio management with rebalancing
+│   ├── stock/                   # Stock entities
+│   └── utils/                   # Shared utilities
 │
 ├── tests/
-│   └── integration/             # Tests de integración
+│   └── integration/             # Integration tests
 │       ├── test_portfolio_rebalancing.py
 │       └── test_large_scale_registry_rebalancing.py
 │
-├── main.py                      # Demo de la aplicación
-├── README.md                    # Este archivo
-├── CLAUDE.md                    # Instrucciones para Claude Code
-├── pyproject.toml               # Configuración del proyecto
-└── pytest.ini                   # Configuración de tests
+├── main.py                      # Application demo
+├── README.md                    # This file
+├── CLAUDE.md                    # Instructions for Claude Code
+├── pyproject.toml               # Project configuration
+└── pytest.ini                   # Test configuration
 ```
 
+---
 
 <div align="center">
 
-**Hecho con 💙 para el proceso de F*word**
+**A demonstration of production-grade software engineering for fintech applications**
 
-[Challenge](#-FWord-portfolio-management-system) • [Testing](#-testing) • [Arquitectura](#-arquitectura)
+[Challenge Overview] • [Testing](#-testing) • [Architecture](#-architecture)
 
 </div>

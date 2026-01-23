@@ -1,67 +1,76 @@
-El punto está en considerar lo NO evidente que envuelve el caso de uso real como lo sería en FWord como tal, literal lo primero fué un bueeeeeeeeen tiempo en investigar sobre particularidades del negocio y FWord, hagamos una simulación.
+# Business Reasoning and Considerations
 
+This document outlines the business reasoning and considerations that went into designing the portfolio rebalancing system. The focus is on considering what is NOT immediately evident in a real-world use case scenario.
 
-CASO 
-Primer día: Hola Bryan, bienvenido a FWord te sumaras al equipo que está en la funcionalidad de “FWord malabarista” que balancea portafolios, vaya y aporte pues.
+## Scenario Simulation
 
-Todo esto sería en lo que me aportaría a la conversación y en algunos casos detallo mi aproach frente a los puntos.
+**First Day Scenario:**
+"Hello Bryan, welcome to the team! You'll be joining the group working on 'Portfolio Juggler' functionality that balances portfolios. Go ahead and contribute."
 
-Razonamiento
-<…deep human thinking mode>
+Below is what I would bring to the conversation, and in some cases, my approach to the points.
 
-Primeras dudas:
-1- Comisiones del broker. ¿Qué broker usa FWord?
-2-¿Puedo comprar fracciones de acciones?
-	FWord usa Alpaca Securities (Buen nombre), que sí permite compra fraccionada, y dice que no cobra comisiones, al parecer tiene una api en condiciones.
-3- Impuestos a la renta de utilidades de capital del país Chile, México afectan al caso de uso?
-Claro pues muchacho, SII y SAT todo lo ven
-Opinión mía ante el equipo: Quien activa el feature debe saber el impacto tributario, pero hay que hacerle la vida sencilla respecto a la recopilación de los ingresos y pérdidas obtenidas de estas ventas auto ejecutadas de sus assets.
+## Reasoning
 
-Adicionales: 
--El mínimo de un asset en FWord acciones es de 1 dolar.
--El tipo de cuenta en el broker probablemente sea de tipo margen, no cash.
-La cuenta de margen permite el "rebalanceo atómico": vender Meta y comprar Apple instantáneamente, usando el dinero de la venta antes de que se liquide oficialmente.
+<...deep human thinking mode>
 
-Este tipo de cuenta nos lleva a “La Big Mamma Regla”: 
-Si una cuenta tiene menos de $25,000 USD (Cuenta Retail), no puede realizar más de 3 "Day Trades" (comprar y vender la misma acción el mismo día) en un periodo de 5 días hábiles.
+### Initial Questions
 
-Opinión mía ante el equipo:  Gente, para no rebalancear constantemente hay que tener un trigger de rebalanceo y manejar los límites de cuentas retail en el broker. podríamos usar:
--% de variación en participación del portafolio que ‘triggeree’ el rebalanceo del portafolio.
-Tipo, rebalancear diferencias de solo 1% o más
+**1. Broker Commissions. Which broker does the platform use?**
 
-<…/deep human thinking mode>
+**2. Can I buy fractional shares?**
 
+The platform uses Alpaca Securities (good name), which does allow fractional trading and states they don't charge commissions. They apparently have a decent API.
 
+**3. Do capital gains taxes in Chile and Mexico affect the use case?**
 
+Absolutely, muchacho. SII and SAT see everything.
 
-Decisiones de equipo:
+**My opinion to the team:** Whoever activates the feature should know the tax impact, but we need to make their life easy regarding collecting the income and losses obtained from these auto-executed asset sales.
 
-El rebalanceo del portafolio es algo que ocurriría en segundo plano?, “Tu portafolio se rebalancea mientras ves Netflix” o sería un feature de “Ejecutar balanceo” y que el usuario ejecuta.
-Opinión mía ante el equipo: Full con el auto rebalanceo mientras ves netflix.
+### Additional Considerations
 
-A nivel sistema, al haber un cambio en el atributo precio de una acción, debe de lanzar el evento de evaluar (o no) los portafolios que contienen esa acción para rebalancearlos si corresponde.
+- The minimum for an asset on the platform is $1 USD.
+- The broker account type is likely margin, not cash.
 
-Que opciones tiene alpaca para no tener que hacer una petición a su endpoint a cada rato ? tiene un webhook que me notifique de algún cambio significativo en el precio de alguna acción?
+A margin account enables "atomic rebalancing": selling Meta and buying Apple instantly, using the money from the sale before it officially settles.
 
-Alguien tiene la data histórica de cambios de precio que tienen las acciones que tenemos disponibles en el feature? así podríamos definir tiempos de chequeo del balanceo basado en el historico. [-Bryan procede a conseguirse la data en la deepweeb si es que FWord no la tiene-]
+This account type leads us to "The Big Mamma Rule":
 
-Vi que alpaca tiene un websocket para suscribirme a eventos cada 1 minuto
-Pero, según la propuesta de valor del feature vale la pena? sí es que sí, consideremos el costo de escalar eso a nivel servidores segun la cantidad de variedad de assets y de portafolios manejados.
+If an account has less than $25,000 USD (Retail Account), it cannot make more than 3 "Day Trades" (buying and selling the same stock on the same day) within a 5-business-day period.
 
-EDGE CASE: Si a la gente del reddit WallStreet Bets le da por hacer un pump and dump en una acción, nuestro sistema debería reaccionar a esto o debe de omitirlo de alguna manera mágica?
-	Opinión mía ante el equipo: Pos sí, sí debería afectar. claramente no es grato, pero es parte de investir y el módulo de trading.
+**My opinion to the team:** People, to avoid constant rebalancing, we need a rebalancing trigger and handle retail account limits at the broker. We could use:
+- Percentage variation in portfolio participation that triggers rebalancing.
+For example, only rebalance differences of 1% or more.
 
+<.../deep human thinking mode>
 
-Requerimientos de la implementación:
+## Team Decisions
 
-La arquitectura debe (IMO) de ser basada en eventos, cambios en el precio significativos que veamos en las acciones ejecutará evaluar rebalanceos.Debe de haber un webshocket que esté escuchando cada 1 segundo las variaciones en el precio de las acciones en el portafolio, debemos escuchar solo los symbols en cartera, no todas las acciones del brokers.
+**Is portfolio rebalancing something that happens in the background, "your portfolio rebalances while you watch Netflix," or should it be an "Execute Rebalance" feature that the user runs?**
 
-Luego de que haya un cambio significativo en la acción, se debe de disparar la evaluación de cambios de portafolio, si al evaluar da como algo a considerar, si se debe ejecutar el balanceo para mantener los porcentajes de distribución de acciones en la colección de acciones.
+**My opinion to the team:** Full support for auto-rebalancing while watching Netflix.
 
-Manejar thresholds para no sobre evaluar balanceos.
-	Cada cuánto porcentaje de variación del precio de una acción evaluamos si hay que rebalancear? obtener de config, usar 1%
+At the system level, when there's a change in the price attribute of a stock, it should launch an evaluation (or not) of portfolios containing that stock to rebalance them if appropriate.
 
+**What options does Alpaca have to avoid making requests to their endpoint constantly? Is there a webhook that notifies me of significant price changes in a stock?**
 
+Does anyone have historical data on price changes for the stocks we have available in the feature? This way we could define rebalancing check times based on history. [-Bryan proceeds to get the data from the deep web if the platform doesn't have it-]
 
+I saw Alpaca has a websocket to subscribe to events every 1 minute.
 
+But, given the feature's value proposition, is it worth it? If yes, we need to consider the cost of scaling at the server level based on the variety of assets and portfolios managed.
 
+**EDGE CASE:** If the WallStreet Bets reddit crowd decides to pump and dump a stock, should our system react to this or should it magically ignore it?
+
+**My opinion to the team:** Yes, it should affect it. Clearly it's not pleasant, but it's part of investing and the trading module.
+
+## Implementation Requirements
+
+**The architecture should (IMO) be event-based:** Significant price changes in stocks will trigger rebalance evaluations.
+
+There should be a websocket listening every 1 second to price variations in portfolio stocks. We should only listen to symbols in our portfolios, not all broker stocks.
+
+After a significant change in a stock, portfolio change evaluation should be triggered. If evaluation shows something to consider, rebalancing should execute to maintain the percentage distribution of stocks in the collection.
+
+**Handle thresholds to avoid over-evaluating rebalances:**
+At what percentage of stock price variation should we evaluate if rebalancing is needed? Get from config, use 1%.

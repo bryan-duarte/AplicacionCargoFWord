@@ -1,7 +1,7 @@
 [project]
-name = "FWord-software-engineer-apply"
+name = "fintech-portfolio-rebalancing"
 version = "0.1.0"
-description = "Add your description here"
+description = "A fintech challenge demonstration: portfolio management system with automatic rebalancing, atomic operations, and comprehensive error handling"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,51 +1,64 @@
-El desarrollo de la aplicación se dividió en 4 etapas:
+# AI Usage Statement
 
+This document describes how Large Language Models (LLMs) were used during the development of this project, maintaining transparency about the development process.
 
-I - Época de Piedra:
-    descripción: Setup de estructura general del proyecto (Streaming de 5 horitas), esto incluye:
-        -Se implementa estructura general del desafío a nivel de componentes principales.
-        -Se diseña algoritmo de rebalanceo.
-        -Se implementa flujo con eventos de cambio de precio.
-    
-    USO DE IA EN ESTA ETAPA:
-        -Bajo, solo este prompt 
-            /prompts/event-handler-prompt.md para 
-        debbug de elemento bloqueante en implementación.
+## Development Phases
 
-II - Él renacimiento:
-    descripción: despues de reflexionar lo mala que era la implementación previa (The 5 hours guy) respecto a la lógica de negocio clave, se mejoran algunos elementos subyacentes previos a cubrir los componentes clave.
+The application development was divided into 4 phases:
 
-        -Se implementa configuración global de profundidad de decimales según hallazgos en documentación de Alpaca (ver link: https://alpaca.markets/learn/fractional-shares-api )
-        -Se incorporan funciones helper en utils para evitar problemas en operaciones con valores de tipo Decimal.
-        -Se mueve el FAKE MARKET a utils al ser un elemento utilitario con neto foco en el demo del rebalanceo.
-        -Se implementa config general de la aplicación (settings), con configs agrupadas por contexto de uso.
-        -Se añaden errores de lógica principal en todos los modulos asociados.
-        -Se añade uuid para tracing de operaciones de compra y venta realizadas con el broker.
-        -Se incorpora schema PortFolioConfig para validar en capa de DTOs todas las reglas de negocios asocidas a la instanciación del portafolio y no saturar en su constructor.
-        -Se añaden validación de instanciación de clase Stock con errores en le módulo respectivo.
-        -Se crea CLAUDE.MD y AGENTS.md para mejor contexto al agente en solicitudes.
-    
-    USO DE IA EN ESTA ETAPA:
-        - Sobre todo en lo que fué la implementación de las herramientas utilitarias de gestión de Decimales. (utils/*)
-        -Para cosas así suelo quemar token como loco pidiendo reportes de analisis de puntos de vista y analisis de opciones con tradeoffs a la IA, e ir iterando dudas hasta tener noción de varias opciones y tradeoffs entre las mismas.
-        -Luego ya sería un planning mode de Claude Code e ir iterando.
+### I - Stone Age
 
-III-Modernismo:
-    descripción: Aquí to bajo el detalle completo de la implementación a realizar con todos los detalles tecnicos de ejecución que debería realizar el agente, describo flujos, modificaciones puntuales a realizar puntuales y uso el planning mode de Claude code para ver puntos ciegos, reviso el plan, solicito ajustes al plan si corresponde y le pido ejecutar el plan.
-    Luego sobre lo que hizo, soy generando modificaciones de limpieza de comentarios (suelen añadir muuchos comentarios la IA), cosas que no se entienden, etc.
+**Description:** Initial project structure setup (approximately 5 hours of work), including:
 
-    Así fué como bajé las dos funcionalidades clave de negocio en el broker y portafolio.
+- Implementation of the general structure for the challenge's main components
+- Design of the rebalancing algorithm
+- Implementation of price change event flow
 
-    USO DE IA EN ESTA ETAPA:
-        -Principalmente dos promps:
-            docs/used_prompts/portfolio-batch-operations-prompt.md
-            docs/used_prompts/portfolio-rebalance-lock-prompt.md
+**AI Usage in This Phase:**
+- Low usage, only one prompt was used:
+  - `docs/used_prompts/event-handler-prompt.md` for debugging a blocking issue in the implementation
 
+### II - The Renaissance
 
-IV: Post modernismo:
-    descripción: Usé varios prompts para recibir sugerencias de estructuras base del pool de tests, pero con preindicaciones mias sobre que casos de negocios se les debe de dar foco en la suit de test. sobre esto se reciben test, se ajustan, se limpian, se van iterando hasta tener una implementación de test que realmente testee la lógica de negocio y que sean isolated para no generar sideeffects
-    
-    USO DE IA EN ESTA ETAPA:
-         -Principalmente los prompts en: docs/used_prompts/testing-prompts.md
+**Description:** After reflecting on the poor quality of the previous implementation (the "5 hours guy") regarding key business logic, several underlying elements were improved before covering the key components:
 
+- Implementation of global decimal depth configuration based on findings in Alpaca documentation (link: https://alpaca.markets/learn/fractional-shares-api)
+- Addition of helper functions in utils to avoid problems with Decimal type operations
+- Moved FAKE MARKET to utils as it's a utility element focused on rebalancing demonstration
+- Implementation of general application configuration (settings), with configs grouped by usage context
+- Addition of main logic errors in all associated modules
+- Addition of UUID for tracking buy and sell operations performed with the broker
+- Incorporation of PortfolioConfig schema to validate in the DTO layer all business rules associated with portfolio instantiation and avoid saturating its constructor
+- Addition of validation for Stock class instantiation with errors in the respective module
+- Creation of CLAUDE.MD and AGENTS.md for better context for the agent in requests
 
+**AI Usage in This Phase:**
+- Mainly in the implementation of Decimal management utility tools (utils/*)
+- For such tasks, I typically spend tokens extensively asking the AI for analysis reports from different viewpoints and options analysis with tradeoffs, iterating doubts until having an understanding of various options and tradeoffs between them
+- Then I would use Claude Code's planning mode and iterate
+
+### III - Modernism
+
+**Description:** Here I detailed the complete implementation to be performed with all technical execution details that the agent should perform. I described flows, specific modifications to be made, and used Claude Code's planning mode to identify blind spots, reviewed the plan, requested adjustments if needed, and asked it to execute the plan.
+
+Afterwards, based on what it did, I generated cleanup modifications of comments (the AI usually adds many comments), things that aren't clear, etc.
+
+This is how I implemented the two key business functionalities in the broker and portfolio.
+
+**AI Usage in This Phase:**
+- Primarily two prompts:
+  - `docs/used_prompts/portfolio-batch-operations-prompt.md`
+  - `docs/used_prompts/portfolio-rebalance-lock-prompt.md`
+
+### IV - Post Modernism
+
+**Description:** I used various prompts to receive suggestions for base test structures, but with my pre-indications about which business cases should be focused on in the test suite. Based on this, tests were received, adjusted, cleaned up, and iterated upon until having a test implementation that truly tests business logic and is isolated to avoid side effects.
+
+**AI Usage in This Phase:**
+- Mainly the prompts in: `docs/used_prompts/testing-prompts.md`
+
+---
+
+## Transparency Commitment
+
+This project demonstrates how AI tools can be effectively used as coding assistants while maintaining human oversight and architectural decision-making. The use of AI accelerated development but all business logic decisions, architecture choices, and implementation strategies were directed by human judgment and expertise in financial software engineering.
