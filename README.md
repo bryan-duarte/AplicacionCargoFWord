@@ -1,5 +1,3 @@
-<img width="1584" height="672" alt="Portfolio Management System Architecture" src="https://github.com/user-attachments/assets/3589e35c-c816-486c-bebf-834b521abbc7" />
-
 <div align="center">
 
 # Fintech Portfolio Auto-Balancer
